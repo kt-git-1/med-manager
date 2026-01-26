@@ -15,9 +15,10 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "jose": "latest",
     "@med/validation": "workspace:*",
+    "@prisma/adapter-pg": "^7.3.0",
     "@prisma/client": "latest",
+    "jose": "latest",
     "next": "latest",
     "react": "latest",
     "react-dom": "latest"
@@ -26,6 +27,7 @@
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "dotenv": "^17.2.3",
     "prisma": "latest",
     "typescript": "latest",
     "vitest": "latest"
