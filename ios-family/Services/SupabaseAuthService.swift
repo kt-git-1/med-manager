@@ -15,8 +15,15 @@ enum SupabaseAuthError: LocalizedError {
 enum SupabaseAuthService {
     static func signIn(email: String, password: String) async throws -> String {
         let client = try makeClient()
-        let session = try await client.auth.signIn(email: email, password: password)
-        return session.accessToken
+        AppLogger.auth.info("Supabase sign-in started")
+        do {
+            let session = try await client.auth.signIn(email: email, password: password)
+            AppLogger.auth.info("Supabase sign-in succeeded")
+            return session.accessToken
+        } catch {
+            AppLogger.auth.error("Supabase sign-in failed: \(error.localizedDescription, privacy: .public)")
+            throw error
+        }
     }
 
     private static func makeClient() throws -> SupabaseClient {

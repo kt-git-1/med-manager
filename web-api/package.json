@@ -21,6 +21,7 @@
     "@prisma/client-runtime-utils": "latest",
     "jose": "latest",
     "next": "latest",
+    "pino": "^10.3.0",
     "react": "latest",
     "react-dom": "latest"
   },

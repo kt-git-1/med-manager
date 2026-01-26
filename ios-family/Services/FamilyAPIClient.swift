@@ -151,7 +151,31 @@ final class FamilyAPIClient {
     }
 
     private func decode<T: Decodable>(_ type: T.Type, request: URLRequest) async throws -> T {
-        let (data, _) = try await URLSession.shared.data(for: request)
-        return try JSONDecoder().decode(T.self, from: data)
+        let start = Date()
+        let method = request.httpMethod ?? "GET"
+        let path = request.url?.path ?? "-"
+        let query = request.url?.query.map { "?\($0)" } ?? ""
+        AppLogger.api.info("Request \(method, privacy: .public) \(path, privacy: .public)\(query, privacy: .public)")
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            let durationMs = Int(Date().timeIntervalSince(start) * 1000)
+            AppLogger.api.info(
+                "Response \(method, privacy: .public) \(path, privacy: .public) status=\(status, privacy: .public) ms=\(durationMs, privacy: .public)"
+            )
+            do {
+                return try JSONDecoder().decode(T.self, from: data)
+            } catch {
+                AppLogger.api.error(
+                    "Decode failed \(method, privacy: .public) \(path, privacy: .public): \(error.localizedDescription, privacy: .public)"
+                )
+                throw error
+            }
+        } catch {
+            AppLogger.api.error(
+                "Request failed \(method, privacy: .public) \(path, privacy: .public): \(error.localizedDescription, privacy: .public)"
+            )
+            throw error
+        }
     }
 }
