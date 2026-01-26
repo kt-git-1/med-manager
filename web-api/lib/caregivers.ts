@@ -1,4 +1,5 @@
 import { type AuthPayload, parseFamilyAuthToken, verifyFamilyJwt } from "@/lib/auth";
+import logger from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 
 function resolveDisplayName(payload: AuthPayload): string {
@@ -47,7 +48,13 @@ export async function resolveFamilyCaregiverId(headers: Headers): Promise<string
     const token = parseFamilyAuthToken(headers);
     const payload = await verifyFamilyJwt(token);
     return await resolveOrCreateCaregiverId(payload);
-  } catch {
+  } catch (error) {
+    logger.warn(
+      {
+        reason: error instanceof Error ? error.message : String(error),
+      },
+      "familyAuth.resolveFailed"
+    );
     return null;
   }
 }

@@ -1,4 +1,5 @@
-import { jwtVerify } from "jose";
+import { decodeJwt, jwtVerify } from "jose";
+import logger from "@/lib/logger";
 
 export type AuthPayload = {
   sub?: string;
@@ -70,7 +71,29 @@ export async function verifyFamilyJwt(token: string): Promise<AuthPayload> {
     throw new AuthError("Missing SUPABASE_JWT_SECRET");
   }
 
-  const encoder = new TextEncoder();
-  const { payload } = await jwtVerify(token, encoder.encode(secret));
-  return payload as AuthPayload;
+  try {
+    const encoder = new TextEncoder();
+    const { payload } = await jwtVerify(token, encoder.encode(secret));
+    return payload as AuthPayload;
+  } catch (error) {
+    try {
+      const decoded = decodeJwt(token);
+      logger.warn(
+        {
+          reason: error instanceof Error ? error.message : String(error),
+          iss: typeof decoded.iss === "string" ? decoded.iss : undefined,
+          aud: decoded.aud,
+        },
+        "familyJwt.verifyFailed"
+      );
+    } catch {
+      logger.warn(
+        {
+          reason: error instanceof Error ? error.message : String(error),
+        },
+        "familyJwt.verifyFailed"
+      );
+    }
+    throw error;
+  }
 }

@@ -48,7 +48,7 @@ final class FamilyAPIClient {
         guard !token.isEmpty else {
             throw FamilyAPIError.missingToken
         }
-        self.baseURL = url
+        self.baseURL = Self.normalizeBaseURL(url)
         self.token = token
     }
 
@@ -148,6 +148,13 @@ final class FamilyAPIClient {
 
     private func attachAuth(to request: inout URLRequest) {
         request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+    }
+
+    private static func normalizeBaseURL(_ url: URL) -> URL {
+        guard url.path.isEmpty || url.path == "/" else {
+            return url
+        }
+        return url.appendingPathComponent("api")
     }
 
     private func decode<T: Decodable>(_ type: T.Type, request: URLRequest) async throws -> T {

@@ -41,7 +41,7 @@ final class APIClient {
         guard let url = URL(string: baseURLString) else {
             throw APIClientError.invalidBaseURL
         }
-        self.baseURL = url
+        self.baseURL = Self.normalizeBaseURL(url)
         self.keychain = keychain
     }
 
@@ -103,6 +103,13 @@ final class APIClient {
             throw APIClientError.missingToken
         }
         request.setValue("Patient \(token)", forHTTPHeaderField: "Authorization")
+    }
+
+    private static func normalizeBaseURL(_ url: URL) -> URL {
+        guard url.path.isEmpty || url.path == "/" else {
+            return url
+        }
+        return url.appendingPathComponent("api")
     }
 
     private func decode<T: Decodable>(_ type: T.Type, request: URLRequest) async throws -> T {
