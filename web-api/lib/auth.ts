@@ -1,4 +1,4 @@
-import { decodeJwt, jwtVerify } from "jose";
+import { createRemoteJWKSet, decodeJwt, decodeProtectedHeader, jwtVerify } from "jose";
 import logger from "@/lib/logger";
 
 export type AuthPayload = {
@@ -65,15 +65,28 @@ export function parsePatientAuthToken(headers: HeaderSource): string {
 }
 
 export async function verifyFamilyJwt(token: string): Promise<AuthPayload> {
-  const secret =
-    process.env.SUPABASE_JWT_SECRET ?? process.env.JWT_SECRET ?? process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!secret) {
-    throw new AuthError("Missing SUPABASE_JWT_SECRET");
-  }
-
   try {
-    const encoder = new TextEncoder();
-    const { payload } = await jwtVerify(token, encoder.encode(secret));
+    const header = decodeProtectedHeader(token);
+    const algorithm = header.alg ?? "unknown";
+    if (algorithm.startsWith("HS")) {
+      const secret =
+        process.env.SUPABASE_JWT_SECRET ??
+        process.env.JWT_SECRET ??
+        process.env.SUPABASE_SERVICE_ROLE_KEY;
+      if (!secret) {
+        throw new AuthError("Missing SUPABASE_JWT_SECRET");
+      }
+      const encoder = new TextEncoder();
+      const { payload } = await jwtVerify(token, encoder.encode(secret));
+      return payload as AuthPayload;
+    }
+
+    const supabaseUrl = process.env.SUPABASE_URL;
+    if (!supabaseUrl) {
+      throw new AuthError("Missing SUPABASE_URL");
+    }
+    const jwks = createRemoteJWKSet(new URL(`${supabaseUrl}/auth/v1/.well-known/jwks.json`));
+    const { payload } = await jwtVerify(token, jwks);
     return payload as AuthPayload;
   } catch (error) {
     try {
