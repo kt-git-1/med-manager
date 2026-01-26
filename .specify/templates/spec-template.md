@@ -100,6 +100,33 @@
 - **[Entity 1]**: [What it represents, key attributes without implementation]
 - **[Entity 2]**: [What it represents, relationships to other entities]
 
+## Security & Privacy Requirements *(mandatory)*
+
+<!--
+  ACTION REQUIRED: Capture security/privacy constraints aligned with the constitution.
+-->
+
+- **SP-001**: System MUST enforce least-privilege access to user medication data
+- **SP-002**: System MUST minimize data collection and retention to what the feature needs
+- **SP-003**: System MUST encrypt sensitive data at rest/in transit or explicitly justify any exception
+
+## API Contract & Decoupling *(mandatory)*
+
+<!--
+  ACTION REQUIRED: Define clear API contracts for iOS/Server/DB boundaries.
+-->
+
+- **AC-001**: System MUST document API contracts across boundaries (iOS/Server/DB)
+- **AC-002**: Contract changes MUST include compatibility and migration notes
+
+## Observability *(mandatory)*
+
+<!--
+  ACTION REQUIRED: Ensure errors are diagnosable and reproducible.
+-->
+
+- **OB-001**: Errors MUST be logged with reproducible steps and sufficient context
+
 ## Success Criteria *(mandatory)*
 
 <!--

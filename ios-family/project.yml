@@ -1,0 +1,33 @@
+name: MedFamily
+options:
+  bundleIdPrefix: com.medmanager
+settings:
+  base:
+    SWIFT_VERSION: "5.9"
+    IPHONEOS_DEPLOYMENT_TARGET: "17.0"
+    DEVELOPMENT_TEAM: ""
+    CODE_SIGN_STYLE: "Automatic"
+targets:
+  MedFamily:
+    type: application
+    platform: iOS
+    sources:
+      - MedFamily
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.medmanager.family
+        INFOPLIST_FILE: MedFamily/Info.plist
+    scheme:
+      testTargets:
+        - MedFamilyTests
+  MedFamilyTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - MedFamilyTests
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.medmanager.familyTests
+        INFOPLIST_FILE: MedFamilyTests/Info.plist
+    dependencies:
+      - target: MedFamily

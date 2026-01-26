@@ -1,0 +1,792 @@
+openapi: 3.0.3
+info:
+  title: Medication MVP API
+  version: 0.3.0
+  description: |
+    API contracts (JSON Schema compatible, Zod-friendly).
+
+    Access rule:
+    - iOS apps access data only via Next.js API (no direct Supabase from clients).
+    - Family endpoints require Supabase JWT.
+    - Patient endpoints use a patient session token issued after link-code verification.
+
+    Family endpoints:
+    - /link-codes
+    - /patients
+    - /patients/{patientId}/medications
+    - /patients/{patientId}/schedules
+    - /patients/{patientId}/dose-instances
+    - /patients/{patientId}/adherence
+    - /patients/{patientId}/inventory
+    - /inventory/adjustments
+
+    Patient endpoints:
+    - /link-codes/verify
+    - /me/dose-instances
+    - /me/adherence
+
+servers:
+  - url: https://api.example.com
+
+paths:
+  /link-codes:
+    post:
+      summary: Create link code (family)
+      security:
+        - FamilyJwt: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LinkCodeCreateRequest"
+      responses:
+        "201":
+          description: Link code created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LinkCode"
+        "400":
+          $ref: "#/components/responses/InvalidInput"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /link-codes/verify:
+    post:
+      summary: Verify link code (patient)
+      description: |
+        Verify a link code and issue a patient session token.
+        This endpoint does not require FamilyJwt.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LinkCodeVerifyRequest"
+      responses:
+        "200":
+          description: Linked and session issued
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PatientSession"
+        "400":
+          $ref: "#/components/responses/InvalidInput"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /patients:
+    get:
+      summary: List patients (family)
+      security:
+        - FamilyJwt: []
+      responses:
+        "200":
+          description: Patient list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Patient"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    post:
+      summary: Create patient (family)
+      security:
+        - FamilyJwt: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatientCreate"
+      responses:
+        "201":
+          description: Patient created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Patient"
+        "400":
+          $ref: "#/components/responses/InvalidInput"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /patients/{patientId}/medications:
+    get:
+      summary: List medications (family)
+      security:
+        - FamilyJwt: []
+      parameters:
+        - $ref: "#/components/parameters/PatientIdPath"
+      responses:
+        "200":
+          description: Medication list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Medication"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    post:
+      summary: Create medication (family)
+      security:
+        - FamilyJwt: []
+      parameters:
+        - $ref: "#/components/parameters/PatientIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MedicationCreate"
+      responses:
+        "201":
+          description: Medication created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Medication"
+        "400":
+          $ref: "#/components/responses/InvalidInput"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /medications/{id}:
+    patch:
+      summary: Update medication (family)
+      security:
+        - FamilyJwt: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MedicationPatch"
+      responses:
+        "200":
+          description: Medication updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Medication"
+        "400":
+          $ref: "#/components/responses/InvalidInput"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    delete:
+      summary: Delete medication (family)
+      security:
+        - FamilyJwt: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /patients/{patientId}/schedules:
+    get:
+      summary: List schedules (family)
+      security:
+        - FamilyJwt: []
+      parameters:
+        - $ref: "#/components/parameters/PatientIdPath"
+      responses:
+        "200":
+          description: Schedule list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Schedule"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    post:
+      summary: Create schedule (family)
+      security:
+        - FamilyJwt: []
+      parameters:
+        - $ref: "#/components/parameters/PatientIdPath"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ScheduleCreate"
+      responses:
+        "201":
+          description: Schedule created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Schedule"
+        "400":
+          $ref: "#/components/responses/InvalidInput"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /patients/{patientId}/dose-instances:
+    get:
+      summary: List dose instances (family)
+      security:
+        - FamilyJwt: []
+      parameters:
+        - $ref: "#/components/parameters/PatientIdPath"
+        - in: query
+          name: date
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Dose instances
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DoseInstance"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /me/dose-instances:
+    get:
+      summary: List dose instances (patient)
+      security:
+        - PatientToken: []
+      parameters:
+        - in: query
+          name: date
+          required: true
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Dose instances
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/DoseInstance"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /me/adherence:
+    get:
+      summary: List adherence logs (patient)
+      security:
+        - PatientToken: []
+      parameters:
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: cursor
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+      responses:
+        "200":
+          description: Adherence logs (paginated)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedAdherenceLogs"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+    post:
+      summary: Create adherence log (patient)
+      description: |
+        Idempotent by clientUuid. Same clientUuid returns the same response.
+        If multiple responses target the same doseInstanceId, MVP uses "last write wins".
+        Inventory is decremented only when action = taken (by doseCountPerIntake).
+      security:
+        - PatientToken: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdherenceCreate"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdherenceLog"
+        "200":
+          description: Already exists (idempotent: same clientUuid)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AdherenceLog"
+        "400":
+          $ref: "#/components/responses/InvalidInput"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          $ref: "#/components/responses/Conflict"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /patients/{patientId}/adherence:
+    get:
+      summary: List adherence logs (family)
+      security:
+        - FamilyJwt: []
+      parameters:
+        - $ref: "#/components/parameters/PatientIdPath"
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: cursor
+          schema:
+            type: string
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+      responses:
+        "200":
+          description: Adherence logs (paginated)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaginatedAdherenceLogs"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /patients/{patientId}/inventory:
+    get:
+      summary: Get inventory (family)
+      security:
+        - FamilyJwt: []
+      parameters:
+        - $ref: "#/components/parameters/PatientIdPath"
+      responses:
+        "200":
+          description: Inventory list for patient
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Inventory"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+  /inventory/adjustments:
+    post:
+      summary: Adjust inventory (family)
+      security:
+        - FamilyJwt: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InventoryAdjustment"
+      responses:
+        "201":
+          description: Inventory adjusted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Inventory"
+        "400":
+          $ref: "#/components/responses/InvalidInput"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+
+components:
+  parameters:
+    PatientIdPath:
+      in: path
+      name: patientId
+      required: true
+      schema:
+        type: string
+
+  securitySchemes:
+    FamilyJwt:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Authorization: Bearer <supabase_jwt>
+    PatientToken:
+      type: apiKey
+      in: header
+      name: Authorization
+      description: Authorization: Patient <patient_session_token>
+
+  schemas:
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          enum: [unauthorized, forbidden, invalid_input, not_found, conflict, rate_limited]
+        message:
+          type: string
+        details:
+          type: object
+
+    LinkCodeCreateRequest:
+      type: object
+      required: [patientId]
+      properties:
+        patientId:
+          type: string
+        ttlMinutes:
+          type: integer
+          minimum: 1
+          maximum: 1440
+          description: Optional TTL override. Default is 10 minutes.
+
+    LinkCode:
+      type: object
+      required: [code, expiresAt]
+      properties:
+        code:
+          type: string
+          description: 6-digit numeric code
+        expiresAt:
+          type: string
+          format: date-time
+
+    LinkCodeVerifyRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+
+    PatientSession:
+      type: object
+      required: [accessToken, expiresIn]
+      properties:
+        accessToken:
+          type: string
+        expiresIn:
+          type: integer
+
+    Patient:
+      type: object
+      required: [id, displayName, timezone]
+      properties:
+        id: { type: string }
+        displayName: { type: string }
+        timezone: { type: string }
+
+    PatientCreate:
+      type: object
+      required: [displayName, timezone]
+      properties:
+        displayName: { type: string }
+        timezone: { type: string }
+
+    Medication:
+      type: object
+      required: [id, name, dosage, doseCountPerIntake, startDate, isActive]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        dosage: { type: string }
+        doseCountPerIntake: { type: integer, minimum: 1 }
+        notes: { type: string }
+        startDate: { type: string, format: date }
+        endDate: { type: string, format: date }
+        isActive: { type: boolean }
+
+    MedicationCreate:
+      type: object
+      required: [name, dosage, startDate, doseCountPerIntake]
+      properties:
+        name: { type: string }
+        dosage: { type: string }
+        doseCountPerIntake: { type: integer, minimum: 1 }
+        notes: { type: string }
+        startDate: { type: string, format: date }
+        endDate: { type: string, format: date }
+        isActive: { type: boolean }
+
+    MedicationPatch:
+      type: object
+      description: Partial update. Omitted fields are unchanged.
+      properties:
+        name: { type: string }
+        dosage: { type: string }
+        doseCountPerIntake: { type: integer, minimum: 1 }
+        notes: { type: string }
+        startDate: { type: string, format: date }
+        endDate: { type: string, format: date }
+        isActive: { type: boolean }
+
+    Schedule:
+      type: object
+      required: [id, medicationId, timesPerDay, timeSlots, startDate, isActive]
+      properties:
+        id: { type: string }
+        medicationId: { type: string }
+        timesPerDay: { type: integer, minimum: 1 }
+        timeSlots:
+          type: array
+          items:
+            $ref: "#/components/schemas/TimeOfDay"
+        startDate: { type: string, format: date }
+        endDate: { type: string, format: date }
+        isActive: { type: boolean }
+
+    ScheduleCreate:
+      type: object
+      required: [medicationId, timesPerDay, timeSlots, startDate]
+      properties:
+        medicationId: { type: string }
+        timesPerDay: { type: integer, minimum: 1 }
+        timeSlots:
+          type: array
+          items:
+            $ref: "#/components/schemas/TimeOfDay"
+        startDate: { type: string, format: date }
+        endDate: { type: string, format: date }
+        isActive: { type: boolean }
+
+    TimeOfDay:
+      type: string
+      description: Local time in HH:mm or HH:mm:ss format.
+      pattern: '^([01]\\d|2[0-3]):[0-5]\\d(:[0-5]\\d)?$'
+      examples: ["08:00", "12:30", "18:45"]
+
+    DoseInstance:
+      type: object
+      required: [id, medicationId, scheduleId, scheduledFor, status]
+      properties:
+        id: { type: string }
+        medicationId: { type: string }
+        scheduleId: { type: string }
+        scheduledFor: { type: string, format: date-time }
+        status:
+          type: string
+          enum: [pending, taken, missed, skipped]
+
+    AdherenceLog:
+      type: object
+      required: [id, doseInstanceId, patientId, action, takenAt, source, clientUuid]
+      properties:
+        id: { type: string }
+        doseInstanceId: { type: string }
+        patientId: { type: string }
+        action: { type: string, enum: [taken, skipped] }
+        takenAt: { type: string, format: date-time }
+        source: { type: string, enum: [patient, family, system] }
+        clientUuid: { type: string, format: uuid }
+
+    AdherenceCreate:
+      type: object
+      required: [doseInstanceId, action, takenAt, clientUuid]
+      properties:
+        doseInstanceId: { type: string }
+        action: { type: string, enum: [taken, skipped] }
+        takenAt: { type: string, format: date-time }
+        clientUuid: { type: string, format: uuid }
+
+    Inventory:
+      type: object
+      required: [medicationId, remainingCount, warningThresholdDays, lastAdjustedAt]
+      properties:
+        medicationId: { type: string }
+        remainingCount: { type: integer, minimum: 0 }
+        warningThresholdDays: { type: integer, minimum: 1 }
+        lastAdjustedAt: { type: string, format: date-time }
+
+    InventoryAdjustment:
+      type: object
+      required: [medicationId, delta, reason]
+      properties:
+        medicationId: { type: string }
+        delta: { type: integer }
+        reason: { type: string, enum: [missed, extra, restock, manual] }
+        note: { type: string }
+
+    PaginatedAdherenceLogs:
+      type: object
+      required: [items, nextCursor]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AdherenceLog"
+        nextCursor:
+          type: string
+          nullable: true
+
+  responses:
+    InvalidInput:
+      description: Invalid input
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Unauthorized:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Forbidden:
+      description: Forbidden
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    NotFound:
+      description: Not found
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    Conflict:
+      description: Conflict
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"
+    RateLimited:
+      description: Too many requests
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/ErrorResponse"

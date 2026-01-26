@@ -31,7 +31,11 @@
 
 *GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-[Gates determined based on constitution file]
+- 仕様（spec）とタスク（tasks）外の実装がない（MVPに集中）
+- セキュリティ/プライバシー要件が最小権限・最小収集・暗号化/秘匿を満たす
+- iOS/サーバ/DBの境界がAPI契約で明確化され、疎結合が維持される
+- 重要ロジック（服薬イベント生成・在庫計算・リマインド判定）の自動テストが計画済み
+- エラーの再現可能なログ/手順が計画に含まれる
 
 ## Project Structure
 

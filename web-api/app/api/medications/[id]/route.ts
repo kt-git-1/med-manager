@@ -1,0 +1,78 @@
+import { medicationPatchSchema } from "@med/validation";
+import { parseFamilyAuthToken, verifyFamilyJwt } from "../../../lib/auth";
+import { invalidInput, notFound, unauthorized } from "../../../lib/errors";
+import { prisma } from "../../../lib/prisma";
+import { serializeMedication } from "../../../lib/serializers";
+
+export const runtime = "nodejs";
+
+async function resolveCaregiverId(headers: Headers): Promise<string | null> {
+  try {
+    const token = parseFamilyAuthToken(headers);
+    const payload = await verifyFamilyJwt(token);
+    if (!payload.sub) return null;
+
+    const caregiver = await prisma.caregiver.findUnique({
+      where: { profileId: payload.sub },
+      select: { id: true },
+    });
+    return caregiver?.id ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function PATCH(
+  request: Request,
+  context: { params: { id: string } }
+): Promise<Response> {
+  const caregiverId = await resolveCaregiverId(request.headers);
+  if (!caregiverId) {
+    return unauthorized("Caregiver not found");
+  }
+
+  const body = medicationPatchSchema.safeParse(await request.json());
+  if (!body.success) {
+    return invalidInput("Invalid request body", { issues: body.error.issues });
+  }
+
+  const medication = await prisma.medication.findFirst({
+    where: { id: context.params.id, patient: { caregiverId } },
+  });
+  if (!medication) {
+    return notFound("Medication not found");
+  }
+
+  const updated = await prisma.medication.update({
+    where: { id: medication.id },
+    data: {
+      ...body.data,
+      notes: body.data.notes === undefined ? undefined : body.data.notes,
+      startDate: body.data.startDate ? new Date(body.data.startDate) : undefined,
+      endDate: body.data.endDate ? new Date(body.data.endDate) : undefined,
+    },
+  });
+
+  return Response.json(serializeMedication(updated), { status: 200 });
+}
+
+export async function DELETE(
+  request: Request,
+  context: { params: { id: string } }
+): Promise<Response> {
+  const caregiverId = await resolveCaregiverId(request.headers);
+  if (!caregiverId) {
+    return unauthorized("Caregiver not found");
+  }
+
+  const medication = await prisma.medication.findFirst({
+    where: { id: context.params.id, patient: { caregiverId } },
+    select: { id: true },
+  });
+  if (!medication) {
+    return notFound("Medication not found");
+  }
+
+  await prisma.medication.delete({ where: { id: medication.id } });
+  return new Response(null, { status: 204 });
+}

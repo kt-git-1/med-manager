@@ -1,0 +1,223 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider   = "postgresql"
+  url        = env("DATABASE_URL")
+  directurl  = env("DIRECT_URL")
+}
+
+enum ProfileRole {
+  family
+}
+
+enum DoseStatus {
+  pending
+  taken
+  missed
+  skipped
+}
+
+enum AdherenceAction {
+  taken
+  skipped
+}
+
+enum AdherenceSource {
+  patient
+  family
+  system
+}
+
+enum InventoryAdjustmentReason {
+  missed
+  extra
+  restock
+  manual
+}
+
+model Profile {
+  id        String      @id @db.Uuid
+  role      ProfileRole @default(family)
+  createdAt DateTime    @default(now()) @map("created_at")
+
+  caregiver Caregiver?
+
+  @@map("profiles")
+}
+
+model Caregiver {
+  id          String    @id @default(uuid()) @db.Uuid
+  profileId   String    @unique @map("profile_id") @db.Uuid
+  displayName String    @map("display_name")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  profile  Profile  @relation(fields: [profileId], references: [id], onDelete: Cascade)
+  patients Patient[]
+  linkCodes LinkCode[]
+
+  @@map("caregivers")
+}
+
+model Patient {
+  id          String           @id @default(uuid()) @db.Uuid
+  caregiverId String           @map("caregiver_id") @db.Uuid
+  displayName String           @map("display_name")
+  timezone    String           @default("Asia/Tokyo")
+  createdAt   DateTime         @default(now()) @map("created_at")
+
+  caregiver        Caregiver         @relation(fields: [caregiverId], references: [id], onDelete: Cascade)
+  medications      Medication[]
+  sessions         PatientSession[]
+  doseInstances    DoseInstance[]
+  adherenceLogs    AdherenceLog[]
+  linkCodes        LinkCode[]
+
+  @@index([caregiverId])
+  @@map("patients")
+}
+
+model LinkCode {
+  id          String    @id @default(uuid()) @db.Uuid
+  caregiverId String    @map("caregiver_id") @db.Uuid
+  patientId   String?   @map("patient_id") @db.Uuid
+  code        String    @db.Char(6)
+  expiresAt   DateTime  @map("expires_at")
+  usedAt      DateTime? @map("used_at")
+  revokedAt   DateTime? @map("revoked_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  caregiver Caregiver @relation(fields: [caregiverId], references: [id], onDelete: Cascade)
+  patient   Patient?  @relation(fields: [patientId], references: [id], onDelete: SetNull)
+
+  @@index([expiresAt])
+  @@index([caregiverId, createdAt(sort: Desc)])
+  @@map("link_codes")
+}
+
+model PatientSession {
+  id            String    @id @default(uuid()) @db.Uuid
+  patientId     String    @map("patient_id") @db.Uuid
+  tokenHash     String    @map("token_hash")
+  issuedAt      DateTime  @default(now()) @map("issued_at")
+  expiresAt     DateTime  @map("expires_at")
+  rotatedFromId String?   @map("rotated_from_id") @db.Uuid
+  revokedAt     DateTime? @map("revoked_at")
+  lastSeenAt    DateTime? @map("last_seen_at")
+
+  patient     Patient         @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  rotatedFrom PatientSession? @relation("SessionRotation", fields: [rotatedFromId], references: [id], onDelete: SetNull)
+  rotatedTo   PatientSession[] @relation("SessionRotation")
+
+  @@unique([tokenHash])
+  @@index([patientId, expiresAt(sort: Desc)])
+  @@index([revokedAt])
+  @@map("patient_sessions")
+}
+
+model Medication {
+  id                 String    @id @default(uuid()) @db.Uuid
+  patientId          String    @map("patient_id") @db.Uuid
+  name               String
+  dosage             String
+  doseCountPerIntake Int       @default(1) @map("dose_count_per_intake")
+  notes              String?
+  startDate          DateTime  @map("start_date") @db.Date
+  endDate            DateTime? @map("end_date") @db.Date
+  isActive           Boolean   @default(true) @map("is_active")
+  createdAt          DateTime  @default(now()) @map("created_at")
+
+  patient   Patient     @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  schedules Schedule[]
+  inventory Inventory?
+  doseInstances DoseInstance[]
+
+  @@index([patientId, isActive])
+  @@index([patientId, name])
+  @@map("medications")
+}
+
+model Schedule {
+  id          String     @id @default(uuid()) @db.Uuid
+  medicationId String    @map("medication_id") @db.Uuid
+  timesPerDay Int        @map("times_per_day")
+  timeSlots   DateTime[] @map("time_slots") @db.Time
+  startDate   DateTime   @map("start_date") @db.Date
+  endDate     DateTime?  @map("end_date") @db.Date
+  isActive    Boolean    @default(true) @map("is_active")
+  createdAt   DateTime   @default(now()) @map("created_at")
+
+  medication  Medication   @relation(fields: [medicationId], references: [id], onDelete: Cascade)
+  doseInstances DoseInstance[]
+
+  @@index([medicationId, isActive])
+  @@index([medicationId, startDate])
+  @@map("schedules")
+}
+
+model DoseInstance {
+  id           String     @id @default(uuid()) @db.Uuid
+  patientId    String     @map("patient_id") @db.Uuid
+  scheduleId   String     @map("schedule_id") @db.Uuid
+  medicationId String     @map("medication_id") @db.Uuid
+  scheduledFor DateTime   @map("scheduled_for")
+  status       DoseStatus
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  patient    Patient    @relation(fields: [patientId], references: [id], onDelete: Cascade)
+  schedule   Schedule   @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  medication Medication @relation(fields: [medicationId], references: [id], onDelete: Cascade)
+  adherenceLogs AdherenceLog[]
+
+  @@unique([patientId, scheduleId, scheduledFor])
+  @@index([patientId, scheduledFor])
+  @@index([scheduleId, scheduledFor])
+  @@map("dose_instances")
+}
+
+model AdherenceLog {
+  id             String           @id @default(uuid()) @db.Uuid
+  doseInstanceId String           @map("dose_instance_id") @db.Uuid
+  patientId      String           @map("patient_id") @db.Uuid
+  action         AdherenceAction
+  takenAt        DateTime         @map("taken_at")
+  source         AdherenceSource
+  clientUuid     String           @map("client_uuid") @db.Uuid
+  createdAt      DateTime         @default(now()) @map("created_at")
+
+  doseInstance DoseInstance @relation(fields: [doseInstanceId], references: [id], onDelete: Cascade)
+  patient      Patient      @relation(fields: [patientId], references: [id], onDelete: Cascade)
+
+  @@unique([patientId, clientUuid])
+  @@index([patientId, takenAt(sort: Desc)])
+  @@index([doseInstanceId])
+  @@map("adherence_logs")
+}
+
+model Inventory {
+  id                  String    @id @default(uuid()) @db.Uuid
+  medicationId        String    @unique @map("medication_id") @db.Uuid
+  remainingCount      Int       @map("remaining_count")
+  warningThresholdDays Int      @default(3) @map("warning_threshold_days")
+  lastAdjustedAt      DateTime  @default(now()) @map("last_adjusted_at")
+
+  medication  Medication           @relation(fields: [medicationId], references: [id], onDelete: Cascade)
+  adjustments InventoryAdjustment[]
+
+  @@map("inventory")
+}
+
+model InventoryAdjustment {
+  id          String                   @id @default(uuid()) @db.Uuid
+  inventoryId String                   @map("inventory_id") @db.Uuid
+  delta       Int
+  reason      InventoryAdjustmentReason
+  note        String?
+  createdAt   DateTime                 @default(now()) @map("created_at")
+
+  inventory Inventory @relation(fields: [inventoryId], references: [id], onDelete: Cascade)
+
+  @@index([inventoryId, createdAt(sort: Desc)])
+  @@map("inventory_adjustments")
+}
