@@ -14,6 +14,18 @@
     "esModuleInterop": true,
     "module": "ESNext",
     "moduleResolution": "Bundler",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": [
+        "./*"
+      ],
+      "@med/validation": [
+        "../packages/validation/src/index.ts"
+      ],
+      "@med/validation/*": [
+        "../packages/validation/src/*"
+      ]
+    },
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "react-jsx",

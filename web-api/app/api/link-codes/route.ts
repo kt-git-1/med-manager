@@ -1,8 +1,8 @@
 import { randomInt } from "crypto";
 import { linkCodeCreateRequestSchema } from "@med/validation";
-import { parseFamilyAuthToken, verifyFamilyJwt } from "../../../lib/auth";
-import { conflict, invalidInput, notFound, unauthorized } from "../../../lib/errors";
-import { prisma } from "../../../lib/prisma";
+import { parseFamilyAuthToken, verifyFamilyJwt } from "@/lib/auth";
+import { conflict, invalidInput, notFound, unauthorized } from "@/lib/errors";
+import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 

@@ -1,9 +1,9 @@
 import { queryDateSchema } from "@med/validation";
-import { parseFamilyAuthToken, verifyFamilyJwt } from "../../../../lib/auth";
-import { invalidInput, notFound, unauthorized } from "../../../../lib/errors";
-import { listDoseInstancesForDate } from "../../../../lib/doseInstances";
-import { prisma } from "../../../../lib/prisma";
-import { serializeDoseInstance } from "../../../../lib/serializers";
+import { parseFamilyAuthToken, verifyFamilyJwt } from "@/lib/auth";
+import { invalidInput, notFound, unauthorized } from "@/lib/errors";
+import { listDoseInstancesForDate } from "@/lib/doseInstances";
+import { prisma } from "@/lib/prisma";
+import { serializeDoseInstance } from "@/lib/serializers";
 
 export const runtime = "nodejs";
 
@@ -25,14 +25,14 @@ async function resolveCaregiverId(headers: Headers): Promise<string | null> {
 
 export async function GET(
   request: Request,
-  context: { params: { patientId: string } }
+  context: { params: Promise<{ patientId: string }> }
 ): Promise<Response> {
   const caregiverId = await resolveCaregiverId(request.headers);
   if (!caregiverId) {
     return unauthorized("Caregiver not found");
   }
 
-  const patientId = context.params.patientId;
+  const { patientId } = await context.params;
   const patient = await prisma.patient.findFirst({
     where: { id: patientId, caregiverId },
     select: { id: true },

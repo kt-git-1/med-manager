@@ -1,10 +1,10 @@
 import { queryDateSchema } from "@med/validation";
-import { parsePatientAuthToken } from "../../../lib/auth";
-import { invalidInput, unauthorized } from "../../../lib/errors";
-import { listDoseInstancesForDate } from "../../../lib/doseInstances";
-import { hashPatientToken } from "../../../lib/patientTokens";
-import { prisma } from "../../../lib/prisma";
-import { serializeDoseInstance } from "../../../lib/serializers";
+import { parsePatientAuthToken } from "@/lib/auth";
+import { invalidInput, unauthorized } from "@/lib/errors";
+import { listDoseInstancesForDate } from "@/lib/doseInstances";
+import { hashPatientToken } from "@/lib/patientTokens";
+import { prisma } from "@/lib/prisma";
+import { serializeDoseInstance } from "@/lib/serializers";
 
 export const runtime = "nodejs";
 

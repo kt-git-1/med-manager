@@ -1,8 +1,8 @@
 import { medicationPatchSchema } from "@med/validation";
-import { parseFamilyAuthToken, verifyFamilyJwt } from "../../../lib/auth";
-import { invalidInput, notFound, unauthorized } from "../../../lib/errors";
-import { prisma } from "../../../lib/prisma";
-import { serializeMedication } from "../../../lib/serializers";
+import { parseFamilyAuthToken, verifyFamilyJwt } from "@/lib/auth";
+import { invalidInput, notFound, unauthorized } from "@/lib/errors";
+import { prisma } from "@/lib/prisma";
+import { serializeMedication } from "@/lib/serializers";
 
 export const runtime = "nodejs";
 
@@ -24,20 +24,21 @@ async function resolveCaregiverId(headers: Headers): Promise<string | null> {
 
 export async function PATCH(
   request: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ): Promise<Response> {
   const caregiverId = await resolveCaregiverId(request.headers);
   if (!caregiverId) {
     return unauthorized("Caregiver not found");
   }
 
+  const { id } = await context.params;
   const body = medicationPatchSchema.safeParse(await request.json());
   if (!body.success) {
     return invalidInput("Invalid request body", { issues: body.error.issues });
   }
 
   const medication = await prisma.medication.findFirst({
-    where: { id: context.params.id, patient: { caregiverId } },
+    where: { id, patient: { caregiverId } },
   });
   if (!medication) {
     return notFound("Medication not found");
@@ -58,15 +59,16 @@ export async function PATCH(
 
 export async function DELETE(
   request: Request,
-  context: { params: { id: string } }
+  context: { params: Promise<{ id: string }> }
 ): Promise<Response> {
   const caregiverId = await resolveCaregiverId(request.headers);
   if (!caregiverId) {
     return unauthorized("Caregiver not found");
   }
 
+  const { id } = await context.params;
   const medication = await prisma.medication.findFirst({
-    where: { id: context.params.id, patient: { caregiverId } },
+    where: { id, patient: { caregiverId } },
     select: { id: true },
   });
   if (!medication) {

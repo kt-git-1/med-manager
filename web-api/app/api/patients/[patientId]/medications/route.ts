@@ -1,8 +1,8 @@
 import { medicationCreateSchema } from "@med/validation";
-import { parseFamilyAuthToken, verifyFamilyJwt } from "../../../../lib/auth";
-import { invalidInput, notFound, unauthorized } from "../../../../lib/errors";
-import { prisma } from "../../../../lib/prisma";
-import { serializeMedication } from "../../../../lib/serializers";
+import { parseFamilyAuthToken, verifyFamilyJwt } from "@/lib/auth";
+import { invalidInput, notFound, unauthorized } from "@/lib/errors";
+import { prisma } from "@/lib/prisma";
+import { serializeMedication } from "@/lib/serializers";
 
 export const runtime = "nodejs";
 
@@ -32,14 +32,14 @@ async function assertPatientOwnership(patientId: string, caregiverId: string): P
 
 export async function GET(
   request: Request,
-  context: { params: { patientId: string } }
+  context: { params: Promise<{ patientId: string }> }
 ): Promise<Response> {
   const caregiverId = await resolveCaregiverId(request.headers);
   if (!caregiverId) {
     return unauthorized("Caregiver not found");
   }
 
-  const patientId = context.params.patientId;
+  const { patientId } = await context.params;
   const hasAccess = await assertPatientOwnership(patientId, caregiverId);
   if (!hasAccess) {
     return notFound("Patient not found");
@@ -55,14 +55,14 @@ export async function GET(
 
 export async function POST(
   request: Request,
-  context: { params: { patientId: string } }
+  context: { params: Promise<{ patientId: string }> }
 ): Promise<Response> {
   const caregiverId = await resolveCaregiverId(request.headers);
   if (!caregiverId) {
     return unauthorized("Caregiver not found");
   }
 
-  const patientId = context.params.patientId;
+  const { patientId } = await context.params;
   const hasAccess = await assertPatientOwnership(patientId, caregiverId);
   if (!hasAccess) {
     return notFound("Patient not found");

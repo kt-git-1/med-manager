@@ -1,7 +1,5 @@
 import { z } from "zod";
 
-export { z };
-
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const isoDateTime = z.string().datetime();
 const timeOfDay = z
@@ -18,7 +16,7 @@ export const errorResponseSchema = z.object({
     "rate_limited",
   ]),
   message: z.string(),
-  details: z.record(z.unknown()).optional(),
+  details: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const linkCodeCreateRequestSchema = z.object({

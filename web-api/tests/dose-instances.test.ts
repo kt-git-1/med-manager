@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildDoseInstancesForDate } from "../lib/doseInstances";
+import { buildDoseInstancesForDate } from "@/lib/doseInstances";
 
 describe("dose instance generation", () => {
   it("creates instances for each time slot on the date", () => {

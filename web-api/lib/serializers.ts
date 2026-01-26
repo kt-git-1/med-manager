@@ -1,4 +1,4 @@
-import type { DoseInstance, Inventory, Medication, Patient, Schedule } from "@prisma/client";
+import type { DoseInstance, Inventory, Medication, Patient, Schedule } from "@/prisma/generated";
 import { formatISODate, formatTimeOfDay } from "./dates";
 
 export function serializePatient(patient: Patient) {

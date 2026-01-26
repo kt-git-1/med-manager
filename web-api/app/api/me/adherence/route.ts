@@ -1,9 +1,9 @@
 import { adherenceCreateSchema, queryAdherenceSchema } from "@med/validation";
-import { parsePatientAuthToken } from "../../../lib/auth";
-import { invalidInput, unauthorized } from "../../../lib/errors";
-import { hashPatientToken } from "../../../lib/patientTokens";
-import { prisma } from "../../../lib/prisma";
-import { applyInventoryDecrement } from "../../../lib/inventory";
+import { parsePatientAuthToken } from "@/lib/auth";
+import { invalidInput, unauthorized } from "@/lib/errors";
+import { hashPatientToken } from "@/lib/patientTokens";
+import { prisma } from "@/lib/prisma";
+import { applyInventoryDecrement } from "@/lib/inventory";
 
 export const runtime = "nodejs";
 

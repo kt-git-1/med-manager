@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { AuthError, parseFamilyAuthToken, parsePatientAuthToken } from "../lib/auth";
+import { AuthError, parseFamilyAuthToken, parsePatientAuthToken } from "@/lib/auth";
 
 describe("auth header parsing", () => {
   it("accepts family bearer token", () => {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isLinkCodeValid } from "../lib/linkCodes";
+import { isLinkCodeValid } from "@/lib/linkCodes";
 
 describe("link code validation", () => {
   it("rejects expired codes", () => {

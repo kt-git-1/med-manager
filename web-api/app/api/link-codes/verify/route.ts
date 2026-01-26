@@ -1,8 +1,8 @@
 import { randomBytes } from "crypto";
 import { linkCodeVerifyRequestSchema } from "@med/validation";
-import { invalidInput, notFound } from "../../../lib/errors";
-import { hashPatientToken } from "../../../lib/patientTokens";
-import { prisma } from "../../../lib/prisma";
+import { invalidInput, notFound } from "@/lib/errors";
+import { hashPatientToken } from "@/lib/patientTokens";
+import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
 

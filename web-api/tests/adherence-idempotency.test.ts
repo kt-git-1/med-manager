@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { findByClientUuid } from "../lib/idempotency";
+import { findByClientUuid } from "@/lib/idempotency";
 
 describe("adherence idempotency", () => {
   it("returns existing record for same clientUuid", () => {

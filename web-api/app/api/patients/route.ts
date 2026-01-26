@@ -1,8 +1,8 @@
 import { patientCreateSchema } from "@med/validation";
-import { parseFamilyAuthToken, verifyFamilyJwt } from "../../lib/auth";
-import { invalidInput, unauthorized } from "../../lib/errors";
-import { prisma } from "../../lib/prisma";
-import { serializePatient } from "../../lib/serializers";
+import { parseFamilyAuthToken, verifyFamilyJwt } from "@/lib/auth";
+import { invalidInput, unauthorized } from "@/lib/errors";
+import { prisma } from "@/lib/prisma";
+import { serializePatient } from "@/lib/serializers";
 
 export const runtime = "nodejs";
 

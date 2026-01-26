@@ -1,9 +1,9 @@
 import { scheduleCreateSchema } from "@med/validation";
-import { parseFamilyAuthToken, verifyFamilyJwt } from "../../../../lib/auth";
-import { invalidInput, notFound, unauthorized } from "../../../../lib/errors";
-import { prisma } from "../../../../lib/prisma";
-import { timeOfDayToDate } from "../../../../lib/dates";
-import { serializeSchedule } from "../../../../lib/serializers";
+import { parseFamilyAuthToken, verifyFamilyJwt } from "@/lib/auth";
+import { invalidInput, notFound, unauthorized } from "@/lib/errors";
+import { prisma } from "@/lib/prisma";
+import { timeOfDayToDate } from "@/lib/dates";
+import { serializeSchedule } from "@/lib/serializers";
 
 export const runtime = "nodejs";
 
@@ -33,14 +33,14 @@ async function assertPatientOwnership(patientId: string, caregiverId: string): P
 
 export async function GET(
   request: Request,
-  context: { params: { patientId: string } }
+  context: { params: Promise<{ patientId: string }> }
 ): Promise<Response> {
   const caregiverId = await resolveCaregiverId(request.headers);
   if (!caregiverId) {
     return unauthorized("Caregiver not found");
   }
 
-  const patientId = context.params.patientId;
+  const { patientId } = await context.params;
   const hasAccess = await assertPatientOwnership(patientId, caregiverId);
   if (!hasAccess) {
     return notFound("Patient not found");
@@ -56,14 +56,14 @@ export async function GET(
 
 export async function POST(
   request: Request,
-  context: { params: { patientId: string } }
+  context: { params: Promise<{ patientId: string }> }
 ): Promise<Response> {
   const caregiverId = await resolveCaregiverId(request.headers);
   if (!caregiverId) {
     return unauthorized("Caregiver not found");
   }
 
-  const patientId = context.params.patientId;
+  const { patientId } = await context.params;
   const hasAccess = await assertPatientOwnership(patientId, caregiverId);
   if (!hasAccess) {
     return notFound("Patient not found");
@@ -90,7 +90,7 @@ export async function POST(
     data: {
       medicationId: medication.id,
       timesPerDay: body.data.timesPerDay,
-      timeSlots: body.data.timeSlots.map((slot) => timeOfDayToDate(slot)),
+      timeSlots: body.data.timeSlots.map((slot: string) => timeOfDayToDate(slot)),
       startDate: new Date(body.data.startDate),
       endDate: body.data.endDate ? new Date(body.data.endDate) : null,
       isActive: body.data.isActive ?? true,
