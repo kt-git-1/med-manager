@@ -69,7 +69,7 @@ struct TodayView: View {
             let today = isoDate()
             let items = try await client.getTodayDoseInstances(date: today)
             doseInstances = items
-            await scheduler.requestAuthorization()
+            try await scheduler.requestAuthorization()
             let times = items.compactMap { parseDate($0.scheduledFor) }
             await scheduler.scheduleTodayNotifications(
                 times: times,

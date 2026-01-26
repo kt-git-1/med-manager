@@ -1,26 +1,10 @@
 import { medicationCreateSchema } from "@med/validation";
-import { parseFamilyAuthToken, verifyFamilyJwt } from "@/lib/auth";
 import { invalidInput, notFound, unauthorized } from "@/lib/errors";
+import { resolveFamilyCaregiverId } from "@/lib/caregivers";
 import { prisma } from "@/lib/prisma";
 import { serializeMedication } from "@/lib/serializers";
 
 export const runtime = "nodejs";
-
-async function resolveCaregiverId(headers: Headers): Promise<string | null> {
-  try {
-    const token = parseFamilyAuthToken(headers);
-    const payload = await verifyFamilyJwt(token);
-    if (!payload.sub) return null;
-
-    const caregiver = await prisma.caregiver.findUnique({
-      where: { profileId: payload.sub },
-      select: { id: true },
-    });
-    return caregiver?.id ?? null;
-  } catch {
-    return null;
-  }
-}
 
 async function assertPatientOwnership(patientId: string, caregiverId: string): Promise<boolean> {
   const patient = await prisma.patient.findFirst({
@@ -34,7 +18,7 @@ export async function GET(
   request: Request,
   context: { params: Promise<{ patientId: string }> }
 ): Promise<Response> {
-  const caregiverId = await resolveCaregiverId(request.headers);
+  const caregiverId = await resolveFamilyCaregiverId(request.headers);
   if (!caregiverId) {
     return unauthorized("Caregiver not found");
   }
@@ -57,7 +41,7 @@ export async function POST(
   request: Request,
   context: { params: Promise<{ patientId: string }> }
 ): Promise<Response> {
-  const caregiverId = await resolveCaregiverId(request.headers);
+  const caregiverId = await resolveFamilyCaregiverId(request.headers);
   if (!caregiverId) {
     return unauthorized("Caregiver not found");
   }

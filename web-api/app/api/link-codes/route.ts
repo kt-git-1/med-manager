@@ -1,7 +1,7 @@
 import { randomInt } from "crypto";
 import { linkCodeCreateRequestSchema } from "@med/validation";
-import { parseFamilyAuthToken, verifyFamilyJwt } from "@/lib/auth";
 import { conflict, invalidInput, notFound, unauthorized } from "@/lib/errors";
+import { resolveFamilyCaregiverId } from "@/lib/caregivers";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -12,28 +12,20 @@ function buildCode(): string {
 
 export async function POST(request: Request): Promise<Response> {
   try {
-    const token = parseFamilyAuthToken(request.headers);
-    const payload = await verifyFamilyJwt(token);
-    if (!payload.sub) {
-      return unauthorized("Missing user id");
-    }
-
     const body = linkCodeCreateRequestSchema.safeParse(await request.json());
     if (!body.success) {
       return invalidInput("Invalid request body", { issues: body.error.issues });
     }
 
-    const caregiver = await prisma.caregiver.findUnique({
-      where: { profileId: payload.sub },
-    });
-    if (!caregiver) {
+    const caregiverId = await resolveFamilyCaregiverId(request.headers);
+    if (!caregiverId) {
       return unauthorized("Caregiver profile not found");
     }
 
     const patient = await prisma.patient.findFirst({
       where: {
         id: body.data.patientId,
-        caregiverId: caregiver.id,
+        caregiverId,
       },
       select: { id: true },
     });
@@ -67,7 +59,7 @@ export async function POST(request: Request): Promise<Response> {
 
     const linkCode = await prisma.linkCode.create({
       data: {
-        caregiverId: caregiver.id,
+        caregiverId,
         patientId: patient.id,
         code,
         expiresAt,

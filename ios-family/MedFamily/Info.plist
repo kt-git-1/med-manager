@@ -2,21 +2,29 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <key>CFBundleDisplayName</key>
-  <string>Med Family</string>
-  <key>CFBundleIdentifier</key>
-  <string>com.medmanager.family</string>
-  <key>CFBundleInfoDictionaryVersion</key>
-  <string>6.0</string>
-  <key>CFBundleName</key>
-  <string>MedFamily</string>
-  <key>CFBundlePackageType</key>
-  <string>APPL</string>
-  <key>CFBundleShortVersionString</key>
-  <string>0.1</string>
-  <key>CFBundleVersion</key>
-  <string>1</string>
-  <key>UILaunchScreen</key>
-  <dict/>
+	<key>SUPABASE_ANON_KEY</key>
+	<string>sb_publishable_7rTfOeOG74x6Z86uu-4cWg_eMLbLmLm</string>
+	<key>SUPABASE_URL</key>
+	<string>https://lrphuwqqlozsjnaksmon.supabase.co</string>
+	<key>API_BASE_URL</key>
+	<string>https://med-manager-web-api.vercel.app/</string>
+	<key>CFBundleDisplayName</key>
+	<string>Med Family</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>com.medmanager.family</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>MedFamily</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>0.1</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>UILaunchScreen</key>
+	<dict/>
 </dict>
 </plist>

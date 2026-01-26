@@ -19,16 +19,23 @@ final class OfflineQueue {
     private let context: ModelContext
 
     init(container: ModelContainer? = nil) {
-        let container = container ?? try! ModelContainer(for: PendingAdherence.self)
-        self.container = container
-        self.context = ModelContext(container)
+        if let container {
+            self.container = container
+            self.context = ModelContext(container)
+            return
+        }
+        do {
+            let created = try ModelContainer(for: PendingAdherence.self)
+            self.container = created
+            self.context = ModelContext(created)
+        } catch {
+            fatalError("Failed to create ModelContainer: \(error)")
+        }
     }
 
     func enqueue(_ item: PendingAdherence) {
-        let fetch = FetchDescriptor<PendingAdherence>(
-            predicate: #Predicate { $0.clientUuid == item.clientUuid }
-        )
-        if let existing = try? context.fetch(fetch), !existing.isEmpty {
+        let items = (try? context.fetch(FetchDescriptor<PendingAdherence>())) ?? []
+        if items.contains(where: { $0.clientUuid == item.clientUuid }) {
             return
         }
         context.insert(item)
@@ -49,15 +56,11 @@ final class OfflineQueue {
     }
 
     func remove(clientUuid: UUID) {
-        let fetch = FetchDescriptor<PendingAdherence>(
-            predicate: #Predicate { $0.clientUuid == clientUuid }
-        )
-        if let items = try? context.fetch(fetch) {
-            for item in items {
-                context.delete(item)
-            }
-            try? context.save()
+        let items = (try? context.fetch(FetchDescriptor<PendingAdherence>())) ?? []
+        for item in items where item.clientUuid == clientUuid {
+            context.delete(item)
         }
+        try? context.save()
     }
 
     func pendingCount() -> Int {
@@ -65,10 +68,7 @@ final class OfflineQueue {
     }
 
     func contains(clientUuid: UUID) -> Bool {
-        let fetch = FetchDescriptor<PendingAdherence>(
-            predicate: #Predicate { $0.clientUuid == clientUuid }
-        )
-        let items = try? context.fetch(fetch)
-        return (items?.isEmpty == false)
+        let items = (try? context.fetch(FetchDescriptor<PendingAdherence>())) ?? []
+        return items.contains(where: { $0.clientUuid == clientUuid })
     }
 }
