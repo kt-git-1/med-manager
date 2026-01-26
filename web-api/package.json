@@ -18,6 +18,7 @@
     "@med/validation": "workspace:*",
     "@prisma/adapter-pg": "^7.3.0",
     "@prisma/client": "latest",
+    "@prisma/client-runtime-utils": "latest",
     "jose": "latest",
     "next": "latest",
     "react": "latest",
