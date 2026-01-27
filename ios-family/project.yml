@@ -18,6 +18,7 @@ targets:
     sources:
       - MedFamily
       - Features/Inventory
+      - Features/Shared
       - Features
       - Components
       - Services

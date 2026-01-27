@@ -15,37 +15,20 @@ struct SchedulesView: View {
         NavigationStack {
             ZStack {
                 Form {
-                    Section {
-                        HStack(spacing: 12) {
-                            Image(systemName: "clock.fill")
-                                .foregroundStyle(.white, .teal)
-                                .font(.title2)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("予定を管理")
-                                    .font(.headline)
-                                Text("患者を選択して予定を追加します。")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
-
-                    Section(header: Text("対象患者")) {
-                        if isLoadingPatients {
-                            Text("読み込み中...")
-                                .foregroundStyle(.secondary)
-                        } else if patients.isEmpty {
-                            Text("患者が見つかりません。連携タブで患者を追加してください。")
-                                .foregroundStyle(.secondary)
-                        } else {
-                            Picker("患者", selection: $selectedPatientId) {
-                                ForEach(patients, id: \.id) { patient in
-                                    Text(patient.displayName).tag(patient.id)
-                                }
-                            }
-                        }
-                    }
+                    FamilyHeaderSection(
+                        systemImage: "clock.fill",
+                        title: "予定を管理",
+                        subtitle: "患者を選択して予定を追加します。"
+                    )
+                    FamilyPatientSection(
+                        isLoadingPatients: isLoadingPatients,
+                        patients: patients,
+                        selectedPatientId: $selectedPatientId,
+                        familyJwtToken: familyJwtToken,
+                        errorMessage: nil,
+                        actionTitle: nil,
+                        onAction: nil
+                    )
                     Section(header: Text("予定一覧")) {
                         if let errorMessage {
                             Text(errorMessage).foregroundStyle(.red)
@@ -79,23 +62,7 @@ struct SchedulesView: View {
                 .navigationTitle("予定")
                 .tint(.teal)
                 .listStyle(.insetGrouped)
-                if isLoading {
-                    Color.black.opacity(0.2)
-                        .ignoresSafeArea()
-                    VStack(spacing: 12) {
-                        Image("AppLogo")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 64, height: 64)
-                        ProgressView()
-                        Text("更新中")
-                            .font(.headline)
-                    }
-                    .padding(20)
-                    .background(.ultraThinMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .shadow(radius: 8)
-                }
+                FamilyLoadingOverlay(isLoading: isLoading)
             }
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {

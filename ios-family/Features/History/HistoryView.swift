@@ -17,8 +17,22 @@ struct HistoryView: View {
         NavigationStack {
             ZStack {
                 List {
-                    headerSection
-                    patientSection
+                    FamilyHeaderSection(
+                        systemImage: "calendar.circle.fill",
+                        title: "服薬履歴",
+                        subtitle: "患者の履歴を一覧/カレンダーで確認できます。"
+                    )
+                    FamilyPatientSection(
+                        isLoadingPatients: isLoadingPatients,
+                        patients: patients,
+                        selectedPatientId: $selectedPatientId,
+                        familyJwtToken: familyJwtToken,
+                        errorMessage: errorMessage,
+                        actionTitle: "履歴を読み込む",
+                        onAction: {
+                            Task { await loadHistory() }
+                        }
+                    )
                     modeSection
                     if selectedMode == .list {
                         historyListSection
@@ -26,23 +40,7 @@ struct HistoryView: View {
                         calendarSection
                     }
                 }
-                if isLoading {
-                    Color.black.opacity(0.2)
-                        .ignoresSafeArea()
-                    VStack(spacing: 12) {
-                        Image("AppLogo")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 64, height: 64)
-                        ProgressView()
-                        Text("更新中")
-                            .font(.headline)
-                    }
-                    .padding(20)
-                    .background(.ultraThinMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .shadow(radius: 8)
-                }
+                FamilyLoadingOverlay(isLoading: isLoading)
             }
             .navigationTitle("履歴")
             .tint(.teal)
@@ -63,52 +61,6 @@ struct HistoryView: View {
             }
             .onChange(of: selectedPatientId) { _ in
                 Task { await loadHistory() }
-            }
-        }
-    }
-
-    private var headerSection: some View {
-        Section {
-            HStack(spacing: 12) {
-                Image(systemName: "calendar.circle.fill")
-                    .foregroundStyle(.white, .teal)
-                    .font(.title2)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("服薬履歴")
-                        .font(.headline)
-                    Text("患者の履歴を一覧/カレンダーで確認できます。")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-            .padding(.vertical, 4)
-        }
-    }
-
-    private var patientSection: some View {
-        Section(header: Text("対象患者")) {
-            if isLoadingPatients {
-                Text("読み込み中...")
-                    .foregroundStyle(.secondary)
-            } else if patients.isEmpty {
-                Text("患者が見つかりません。連携タブで患者を追加してください。")
-                    .foregroundStyle(.secondary)
-            } else {
-                Picker("患者", selection: $selectedPatientId) {
-                    ForEach(patients, id: \.id) { patient in
-                        Text(patient.displayName).tag(patient.id)
-                    }
-                }
-            }
-            Button("履歴を読み込む") {
-                Task { await loadHistory() }
-            }
-            .buttonStyle(.bordered)
-            .tint(.teal)
-            .disabled(selectedPatientId.isEmpty || familyJwtToken.isEmpty)
-            if let errorMessage {
-                Text(errorMessage)
-                    .foregroundStyle(.red)
             }
         }
     }
