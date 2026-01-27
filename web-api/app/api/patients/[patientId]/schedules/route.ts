@@ -66,6 +66,11 @@ export async function POST(
       return invalidInput("timeSlots length must match timesPerDay");
     }
 
+    const daysOfWeek = body.data.daysOfWeek ?? [0, 1, 2, 3, 4, 5, 6];
+    if (daysOfWeek.length === 0) {
+      return invalidInput("daysOfWeek must include at least one day");
+    }
+
     const medication = await prisma.medication.findFirst({
       where: { id: body.data.medicationId, patientId },
       select: { id: true },
@@ -77,6 +82,7 @@ export async function POST(
     const schedule = await prisma.schedule.create({
       data: {
         medicationId: medication.id,
+        daysOfWeek,
         timesPerDay: body.data.timesPerDay,
         timeSlots: body.data.timeSlots.map((slot: string) => timeOfDayToDate(slot)),
         startDate: new Date(body.data.startDate),

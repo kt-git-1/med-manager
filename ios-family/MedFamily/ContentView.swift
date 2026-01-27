@@ -8,10 +8,6 @@ struct ContentView: View {
             FamilyLoginView()
         } else {
             TabView {
-                PatientsView()
-                    .tabItem {
-                        Label("患者", systemImage: "person.2")
-                    }
                 MedicationsView()
                     .tabItem {
                         Label("薬", systemImage: "pills")
@@ -22,9 +18,10 @@ struct ContentView: View {
                     }
                 LinkingCodeView()
                     .tabItem {
-                        Label("連携", systemImage: "link")
+                        Label("患者/連携", systemImage: "person.badge.plus")
                     }
             }
+            .tint(.teal)
         }
     }
 }

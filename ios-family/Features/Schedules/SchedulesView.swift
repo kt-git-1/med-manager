@@ -1,9 +1,11 @@
 import SwiftUI
 
 struct SchedulesView: View {
-    @AppStorage("familyApiBaseURL") private var apiBaseURL: String = ""
     @AppStorage("familyJwtToken") private var familyJwtToken: String = ""
-    @State private var patientId: String = ""
+    @AppStorage("familySelectedPatientId") private var storedPatientId: String = ""
+    @State private var patients: [FamilyPatientDTO] = []
+    @State private var selectedPatientId: String = ""
+    @State private var isLoadingPatients = false
     @State private var schedules: [FamilyScheduleDTO] = []
     @State private var medicationId: String = ""
     @State private var timesPerDay: String = "1"
@@ -15,25 +17,60 @@ struct SchedulesView: View {
     var body: some View {
         NavigationStack {
             Form {
-                APIConfigForm(apiBaseURL: $apiBaseURL, authToken: $familyJwtToken)
+                Section {
+                    HStack(spacing: 12) {
+                        Image(systemName: "clock.fill")
+                            .foregroundStyle(.white, .teal)
+                            .font(.title2)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("予定を管理")
+                                .font(.headline)
+                            Text("患者を選択して予定を追加します。")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+
                 Section(header: Text("対象患者")) {
-                    TextField("patientId", text: $patientId)
-                        .textInputAutocapitalization(.never)
+                    if isLoadingPatients {
+                        Text("読み込み中...")
+                            .foregroundStyle(.secondary)
+                    } else if patients.isEmpty {
+                        Text("患者が見つかりません。連携タブで患者を追加してください。")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Picker("患者", selection: $selectedPatientId) {
+                            ForEach(patients, id: \.id) { patient in
+                                Text(patient.displayName).tag(patient.id)
+                            }
+                        }
+                    }
                     Button("予定一覧を読み込む") {
                         Task { await loadSchedules() }
                     }
-                    .disabled(patientId.isEmpty || apiBaseURL.isEmpty || familyJwtToken.isEmpty)
+                    .buttonStyle(.bordered)
+                    .tint(.teal)
+                    .disabled(selectedPatientId.isEmpty || familyJwtToken.isEmpty)
                 }
                 Section(header: Text("予定一覧")) {
                     if let errorMessage {
                         Text(errorMessage).foregroundStyle(.red)
                     }
-                    ForEach(schedules, id: \.id) { schedule in
-                        VStack(alignment: .leading) {
-                            Text(schedule.timeSlots.joined(separator: " / "))
-                            Text("開始日: \(schedule.startDate)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                    if schedules.isEmpty {
+                        Text("まだ予定が登録されていません。")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(schedules, id: \.id) { schedule in
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(schedule.timeSlots.joined(separator: " / "))
+                                    .font(.headline)
+                                Text("開始日: \(schedule.startDate)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.vertical, 4)
                         }
                     }
                 }
@@ -48,25 +85,55 @@ struct SchedulesView: View {
                     Button("追加する") {
                         Task { await createSchedule() }
                     }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.teal)
                     .disabled(
-                        patientId.isEmpty ||
+                        selectedPatientId.isEmpty ||
                         medicationId.isEmpty ||
                         timeSlots.isEmpty ||
                         startDate.isEmpty ||
-                        apiBaseURL.isEmpty ||
                         familyJwtToken.isEmpty
                     )
                 }
             }
             .navigationTitle("予定")
+            .tint(.teal)
+            .listStyle(.insetGrouped)
+            .toolbar {
+                Button("更新") {
+                    Task { await loadPatients() }
+                }
+            }
+            .task {
+                await loadPatients()
+            }
+        }
+    }
+
+    private func loadPatients() async {
+        errorMessage = nil
+        isLoadingPatients = true
+        defer { isLoadingPatients = false }
+        do {
+            let client = try FamilyAPIClient(token: familyJwtToken)
+            let result = try await client.listPatients()
+            patients = result
+            if !storedPatientId.isEmpty, result.contains(where: { $0.id == storedPatientId }) {
+                selectedPatientId = storedPatientId
+            } else if selectedPatientId.isEmpty, let first = result.first?.id {
+                selectedPatientId = first
+            }
+        } catch {
+            errorMessage = "患者一覧の取得に失敗しました。"
         }
     }
 
     private func loadSchedules() async {
         errorMessage = nil
         do {
-            let client = try FamilyAPIClient(baseURLString: apiBaseURL, token: familyJwtToken)
-            schedules = try await client.listSchedules(patientId: patientId)
+            let client = try FamilyAPIClient(token: familyJwtToken)
+            schedules = try await client.listSchedules(patientId: selectedPatientId)
+            storedPatientId = selectedPatientId
         } catch {
             errorMessage = "予定一覧の取得に失敗しました。"
         }
@@ -84,9 +151,9 @@ struct SchedulesView: View {
             return
         }
         do {
-            let client = try FamilyAPIClient(baseURLString: apiBaseURL, token: familyJwtToken)
+            let client = try FamilyAPIClient(token: familyJwtToken)
             let schedule = try await client.createSchedule(
-                patientId: patientId,
+                patientId: selectedPatientId,
                 medicationId: medicationId,
                 timesPerDay: count,
                 timeSlots: slots,
@@ -94,6 +161,7 @@ struct SchedulesView: View {
                 endDate: endDate.isEmpty ? nil : endDate
             )
             schedules.insert(schedule, at: 0)
+            storedPatientId = selectedPatientId
             medicationId = ""
             timeSlots = ""
         } catch {

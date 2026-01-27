@@ -12,6 +12,21 @@ struct TodayView: View {
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    HStack(spacing: 12) {
+                        Image(systemName: "sun.max.fill")
+                            .foregroundStyle(.white, .teal)
+                            .font(.title2)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("今日の服薬")
+                                .font(.headline)
+                            Text("予定に合わせて反応を記録します。")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
                 if let errorMessage {
                     Text(errorMessage)
                         .foregroundStyle(.red)
@@ -29,10 +44,12 @@ struct TodayView: View {
                                         Task { await sendAdherence(item, action: "taken") }
                                     }
                                     .buttonStyle(.borderedProminent)
+                                    .tint(.teal)
                                     Button("スキップ") {
                                         Task { await sendAdherence(item, action: "skipped") }
                                     }
                                     .buttonStyle(.bordered)
+                                    .tint(.teal)
                                 }
                             }
                         }
@@ -40,6 +57,8 @@ struct TodayView: View {
                 }
             }
             .navigationTitle("今日")
+            .tint(.teal)
+            .listStyle(.insetGrouped)
             .toolbar {
                 Button("更新") {
                     Task { await reload() }

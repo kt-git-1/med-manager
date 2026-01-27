@@ -22,6 +22,7 @@ struct ContentView: View {
                             Label("履歴", systemImage: "calendar")
                         }
                 }
+                .tint(.teal)
             }
         }
         .task {

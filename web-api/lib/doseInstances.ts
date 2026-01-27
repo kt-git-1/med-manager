@@ -1,5 +1,11 @@
 import type { Prisma, PrismaClient } from "@/prisma/generated";
-import { formatISODate, formatTimeOfDay, resolveZonedDateRange, zonedTimeToUtc } from "./dates";
+import {
+  formatISODate,
+  formatTimeOfDay,
+  resolveWeekdayIndex,
+  resolveZonedDateRange,
+  zonedTimeToUtc,
+} from "./dates";
 
 type PrismaLike = Prisma.TransactionClient | PrismaClient;
 
@@ -77,14 +83,19 @@ export async function ensureDoseInstancesForDate(
     select: {
       id: true,
       medicationId: true,
+      daysOfWeek: true,
       startDate: true,
       endDate: true,
       timeSlots: true,
     },
   });
 
+  const weekday = resolveWeekdayIndex(date, patient.timezone);
   const drafts = schedules.flatMap((schedule) => {
     if (!isScheduleActiveForDate(schedule.startDate, schedule.endDate, date)) {
+      return [];
+    }
+    if (schedule.daysOfWeek.length > 0 && !schedule.daysOfWeek.includes(weekday)) {
       return [];
     }
 

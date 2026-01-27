@@ -25,6 +25,7 @@ struct FamilyMedicationDTO: Decodable {
 struct FamilyScheduleDTO: Decodable {
     let id: String
     let medicationId: String
+    let daysOfWeek: [Int]?
     let timesPerDay: Int
     let timeSlots: [String]
     let startDate: String
@@ -35,6 +36,13 @@ struct FamilyScheduleDTO: Decodable {
 struct LinkCodeDTO: Decodable {
     let code: String
     let expiresAt: String
+}
+
+struct InventoryDTO: Decodable {
+    let medicationId: String
+    let remainingCount: Int
+    let warningThresholdDays: Int
+    let lastAdjustedAt: String
 }
 
 final class FamilyAPIClient {
@@ -50,6 +58,10 @@ final class FamilyAPIClient {
         }
         self.baseURL = Self.normalizeBaseURL(url)
         self.token = token
+    }
+
+    convenience init(token: String) throws {
+        try self.init(baseURLString: Self.apiBaseURLString(), token: token)
     }
 
     func listPatients() async throws -> [FamilyPatientDTO] {
@@ -113,6 +125,7 @@ final class FamilyAPIClient {
     func createSchedule(
         patientId: String,
         medicationId: String,
+        daysOfWeek: [Int],
         timesPerDay: Int,
         timeSlots: [String],
         startDate: String,
@@ -125,6 +138,7 @@ final class FamilyAPIClient {
         attachAuth(to: &request)
         var body: [String: Any] = [
             "medicationId": medicationId,
+            "daysOfWeek": daysOfWeek,
             "timesPerDay": timesPerDay,
             "timeSlots": timeSlots,
             "startDate": startDate,
@@ -132,6 +146,27 @@ final class FamilyAPIClient {
         if let endDate { body["endDate"] = endDate }
         request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
         return try await decode(FamilyScheduleDTO.self, request: request)
+    }
+
+    func createInventoryAdjustment(
+        medicationId: String,
+        delta: Int,
+        reason: String,
+        note: String? = nil
+    ) async throws -> InventoryDTO {
+        let endpoint = baseURL.appendingPathComponent("/inventory/adjustments")
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        attachAuth(to: &request)
+        var body: [String: Any] = [
+            "medicationId": medicationId,
+            "delta": delta,
+            "reason": reason,
+        ]
+        if let note { body["note"] = note }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+        return try await decode(InventoryDTO.self, request: request)
     }
 
     func createLinkCode(patientId: String, ttlMinutes: Int? = nil) async throws -> LinkCodeDTO {
@@ -155,6 +190,10 @@ final class FamilyAPIClient {
             return url
         }
         return url.appendingPathComponent("api")
+    }
+
+    private static func apiBaseURLString() -> String {
+        Bundle.main.object(forInfoDictionaryKey: "API_BASE_URL") as? String ?? ""
     }
 
     private func decode<T: Decodable>(_ type: T.Type, request: URLRequest) async throws -> T {

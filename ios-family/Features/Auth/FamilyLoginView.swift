@@ -1,7 +1,6 @@
 import SwiftUI
 
 struct FamilyLoginView: View {
-    @AppStorage("familyApiBaseURL") private var apiBaseURL: String = ""
     @AppStorage("familyJwtToken") private var familyJwtToken: String = ""
     @State private var email: String = ""
     @State private var password: String = ""
@@ -11,6 +10,22 @@ struct FamilyLoginView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    HStack(spacing: 12) {
+                        Image(systemName: "lock.shield.fill")
+                            .foregroundStyle(.white, .teal)
+                            .font(.title2)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("家族アカウントでログイン")
+                                .font(.headline)
+                            Text("ログイン後に患者登録や連携コード発行ができます。")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+
                 Section(header: Text("ログイン")) {
                     TextField("メールアドレス", text: $email)
                         .textInputAutocapitalization(.never)
@@ -22,15 +37,18 @@ struct FamilyLoginView: View {
                     Button(isLoading ? "ログイン中..." : "ログイン") {
                         Task { await signIn() }
                     }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.teal)
                     .disabled(isLoading || email.isEmpty || password.isEmpty)
                     if let errorMessage {
                         Text(errorMessage).foregroundStyle(.red)
                     }
                 }
 
-                APIConfigForm(apiBaseURL: $apiBaseURL, authToken: $familyJwtToken)
             }
             .navigationTitle("家族ログイン")
+            .tint(.teal)
+            .listStyle(.insetGrouped)
         }
     }
 

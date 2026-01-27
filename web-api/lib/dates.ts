@@ -53,6 +53,25 @@ export function resolveZonedDateRange(date: string, timeZone: string): { from: D
   return { from, to };
 }
 
+export function resolveWeekdayIndex(date: string, timeZone: string): number {
+  const [year, month, day] = parseDateParts(date);
+  const noonUtc = new Date(Date.UTC(year, month - 1, day, 12, 0, 0));
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    weekday: "short",
+  });
+  const weekday = formatter.format(noonUtc);
+  const map: Record<string, number> = {
+    Sun: 0,
+    Mon: 1,
+    Tue: 2,
+    Wed: 3,
+    Thu: 4,
+    Fri: 5,
+    Sat: 6,
+  };
+  return map[weekday] ?? 0;
+}
 export function timeOfDayToDate(time: string): Date {
   const [hour, minute, second] = parseTimeParts(time);
   return new Date(Date.UTC(1970, 0, 1, hour, minute, second));

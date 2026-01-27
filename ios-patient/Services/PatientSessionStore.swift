@@ -6,16 +6,35 @@ final class PatientSessionStore: ObservableObject {
     private let keychain = KeychainStore()
 
     func load() {
-        token = try? keychain.readToken()
+        AppLogger.auth.info("Session load started")
+        do {
+            token = try keychain.readToken()
+            AppLogger.auth.info("Session load completed")
+        } catch {
+            AppLogger.auth.error("Session load failed: \(error.localizedDescription, privacy: .public)")
+            token = nil
+        }
     }
 
     func save(token: String) {
-        try? keychain.saveToken(token)
-        self.token = token
+        AppLogger.auth.info("Session save started")
+        do {
+            try keychain.saveToken(token)
+            self.token = token
+            AppLogger.auth.info("Session save completed")
+        } catch {
+            AppLogger.auth.error("Session save failed: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     func clear() {
-        try? keychain.deleteToken()
-        token = nil
+        AppLogger.auth.info("Session clear started")
+        do {
+            try keychain.deleteToken()
+            token = nil
+            AppLogger.auth.info("Session clear completed")
+        } catch {
+            AppLogger.auth.error("Session clear failed: \(error.localizedDescription, privacy: .public)")
+        }
     }
 }

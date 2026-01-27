@@ -10,6 +10,21 @@ struct LinkingView: View {
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    HStack(spacing: 12) {
+                        Image(systemName: "person.crop.circle.badge.checkmark")
+                            .foregroundStyle(.white, .teal)
+                            .font(.title2)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("本人アプリの連携")
+                                .font(.headline)
+                            Text("家族から受け取った6桁コードを入力してください。")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
                 Section(header: Text("連携コード")) {
                     TextField("6桁コード", text: $code)
                         .keyboardType(.numberPad)
@@ -21,9 +36,13 @@ struct LinkingView: View {
                 Button(isLoading ? "連携中..." : "連携する") {
                     Task { await link() }
                 }
+                .buttonStyle(.borderedProminent)
+                .tint(.teal)
                 .disabled(code.count < 6 || isLoading || apiBaseURL.isEmpty)
             }
             .navigationTitle("連携")
+            .tint(.teal)
+            .listStyle(.insetGrouped)
         }
     }
 

@@ -26,6 +26,7 @@ export function serializeSchedule(schedule: Schedule) {
   return {
     id: schedule.id,
     medicationId: schedule.medicationId,
+    daysOfWeek: schedule.daysOfWeek,
     timesPerDay: schedule.timesPerDay,
     timeSlots: schedule.timeSlots.map((slot) => formatTimeOfDay(slot)),
     startDate: formatISODate(schedule.startDate),

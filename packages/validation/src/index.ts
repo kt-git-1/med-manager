@@ -83,6 +83,7 @@ export const medicationPatchSchema = z.object({
 export const scheduleSchema = z.object({
   id: z.string(),
   medicationId: z.string(),
+  daysOfWeek: z.array(z.number().int().min(0).max(6)),
   timesPerDay: z.number().int().min(1),
   timeSlots: z.array(timeOfDay),
   startDate: isoDate,
@@ -92,6 +93,7 @@ export const scheduleSchema = z.object({
 
 export const scheduleCreateSchema = z.object({
   medicationId: z.string(),
+  daysOfWeek: z.array(z.number().int().min(0).max(6)).min(1).max(7).optional(),
   timesPerDay: z.number().int().min(1),
   timeSlots: z.array(timeOfDay),
   startDate: isoDate,

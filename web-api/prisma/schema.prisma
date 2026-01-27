@@ -141,6 +141,7 @@ model Medication {
 model Schedule {
   id          String     @id @default(uuid()) @db.Uuid
   medicationId String    @map("medication_id") @db.Uuid
+  daysOfWeek  Int[]      @default(dbgenerated("ARRAY[0,1,2,3,4,5,6]::int4[]")) @map("days_of_week")
   timesPerDay Int        @map("times_per_day")
   timeSlots   DateTime[] @map("time_slots") @db.Time
   startDate   DateTime   @map("start_date") @db.Date
