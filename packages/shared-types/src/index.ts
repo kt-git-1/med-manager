@@ -65,6 +65,8 @@ export type Inventory = {
   remainingCount: number;
   warningThresholdDays: number;
   lastAdjustedAt: ISODateTime;
+  remainingDays: number | null;
+  isWarning: boolean;
 };
 
 export type InventoryAdjustment = {

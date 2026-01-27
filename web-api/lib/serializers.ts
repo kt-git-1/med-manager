@@ -57,12 +57,19 @@ export function serializeDoseInstance(instance: DoseInstanceWithMedication) {
   };
 }
 
-export function serializeInventory(inventory: Inventory) {
+type InventorySummary = {
+  remainingDays?: number | null;
+  isWarning?: boolean;
+};
+
+export function serializeInventory(inventory: Inventory & InventorySummary) {
   return {
     medicationId: inventory.medicationId,
     remainingCount: inventory.remainingCount,
     warningThresholdDays: inventory.warningThresholdDays,
     lastAdjustedAt: inventory.lastAdjustedAt.toISOString(),
+    remainingDays: inventory.remainingDays ?? null,
+    isWarning: inventory.isWarning ?? false,
   };
 }
 

@@ -1,9 +1,12 @@
 import { inventoryAdjustmentSchema } from "@med/validation";
 import { resolveFamilyCaregiverId } from "@/lib/caregivers";
 import { invalidInput, notFound, unauthorized } from "@/lib/errors";
+import { summarizeInventory } from "@/lib/inventory";
 import { prisma } from "@/lib/prisma";
 import { serializeInventory } from "@/lib/serializers";
 import { withRequestLogging } from "@/lib/requestLogging";
+
+export const runtime = "nodejs";
 
 export async function POST(request: Request): Promise<Response> {
   return withRequestLogging(request, "POST /inventory/adjustments", async () => {
@@ -19,7 +22,13 @@ export async function POST(request: Request): Promise<Response> {
 
     const medication = await prisma.medication.findFirst({
       where: { id: body.data.medicationId, patient: { caregiverId } },
-      select: { id: true },
+      select: {
+        id: true,
+        doseCountPerIntake: true,
+        schedules: {
+          select: { timeSlots: true, timesPerDay: true, isActive: true },
+        },
+      },
     });
     if (!medication) {
       return notFound("Medication not found");
@@ -55,6 +64,19 @@ export async function POST(request: Request): Promise<Response> {
       return inventory;
     });
 
-    return Response.json(serializeInventory(result), { status: 201 });
+    const summary = summarizeInventory(
+      result.remainingCount,
+      result.warningThresholdDays,
+      medication.doseCountPerIntake,
+      medication.schedules
+    );
+    return Response.json(
+      serializeInventory({
+        ...result,
+        remainingDays: summary.remainingDays,
+        isWarning: summary.isWarning,
+      }),
+      { status: 201 }
+    );
   });
 }

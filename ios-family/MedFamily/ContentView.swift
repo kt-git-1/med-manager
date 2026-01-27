@@ -22,6 +22,10 @@ struct ContentView: View {
                         .tabItem {
                             Label("履歴", systemImage: "calendar")
                         }
+                    InventoryView()
+                        .tabItem {
+                            Label("在庫", systemImage: "tray.full")
+                        }
                     LinkingCodeView()
                         .tabItem {
                             Label("患者/連携", systemImage: "person.badge.plus")

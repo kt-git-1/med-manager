@@ -1,6 +1,7 @@
 import { notFound, unauthorized } from "@/lib/errors";
 import { resolveFamilyCaregiverId } from "@/lib/caregivers";
 import { prisma } from "@/lib/prisma";
+import { summarizeInventory } from "@/lib/inventory";
 import { serializeInventory } from "@/lib/serializers";
 import { withRequestLogging } from "@/lib/requestLogging";
 
@@ -28,8 +29,32 @@ export async function GET(
     const inventory = await prisma.inventory.findMany({
       where: { medication: { patientId } },
       orderBy: { lastAdjustedAt: "desc" },
+      include: {
+        medication: {
+          select: {
+            doseCountPerIntake: true,
+            schedules: {
+              select: { timeSlots: true, timesPerDay: true, isActive: true },
+            },
+          },
+        },
+      },
     });
 
-    return Response.json(inventory.map(serializeInventory), { status: 200 });
+    const response = inventory.map((item) => {
+      const summary = summarizeInventory(
+        item.remainingCount,
+        item.warningThresholdDays,
+        item.medication.doseCountPerIntake,
+        item.medication.schedules
+      );
+      return serializeInventory({
+        ...item,
+        remainingDays: summary.remainingDays,
+        isWarning: summary.isWarning,
+      });
+    });
+
+    return Response.json(response, { status: 200 });
   });
 }

@@ -725,12 +725,17 @@ components:
 
     Inventory:
       type: object
-      required: [medicationId, remainingCount, warningThresholdDays, lastAdjustedAt]
+      required: [medicationId, remainingCount, warningThresholdDays, lastAdjustedAt, remainingDays, isWarning]
       properties:
         medicationId: { type: string }
         remainingCount: { type: integer, minimum: 0 }
         warningThresholdDays: { type: integer, minimum: 1 }
         lastAdjustedAt: { type: string, format: date-time }
+        remainingDays:
+          type: integer
+          minimum: 0
+          nullable: true
+        isWarning: { type: boolean }
 
     InventoryAdjustment:
       type: object

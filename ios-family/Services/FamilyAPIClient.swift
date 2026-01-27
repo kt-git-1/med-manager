@@ -43,6 +43,8 @@ struct InventoryDTO: Decodable {
     let remainingCount: Int
     let warningThresholdDays: Int
     let lastAdjustedAt: String
+    let remainingDays: Int?
+    let isWarning: Bool
 }
 
 struct FamilyAdherenceLogDTO: Decodable {
@@ -241,6 +243,13 @@ final class FamilyAPIClient {
         if let note { body["note"] = note }
         request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
         return try await decode(InventoryDTO.self, request: request)
+    }
+
+    func listInventory(patientId: String) async throws -> [InventoryDTO] {
+        let endpoint = baseURL.appendingPathComponent("/patients/\(patientId)/inventory")
+        var request = URLRequest(url: endpoint)
+        attachAuth(to: &request)
+        return try await decode([InventoryDTO].self, request: request)
     }
 
     func createLinkCode(patientId: String, ttlMinutes: Int? = nil) async throws -> LinkCodeDTO {

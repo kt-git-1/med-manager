@@ -3,7 +3,7 @@ import { parsePatientAuthToken } from "@/lib/auth";
 import { invalidInput, unauthorized } from "@/lib/errors";
 import { hashPatientToken } from "@/lib/patientTokens";
 import { prisma } from "@/lib/prisma";
-import { applyInventoryDecrement } from "@/lib/inventory";
+import { applyInventoryDecrement, shouldDecrementInventory } from "@/lib/inventory";
 import { listAdherenceLogs } from "@/lib/adherence";
 import { withRequestLogging } from "@/lib/requestLogging";
 
@@ -103,7 +103,7 @@ export async function POST(request: Request): Promise<Response> {
         data: { status: body.data.action === "taken" ? "taken" : "skipped" },
       });
 
-      if (body.data.action === "taken" && doseInstance.status !== "taken") {
+      if (shouldDecrementInventory(body.data.action, doseInstance.status)) {
         await applyInventoryDecrement(tx, doseInstance.medicationId);
       }
 

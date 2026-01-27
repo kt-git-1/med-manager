@@ -140,6 +140,8 @@ export const inventorySchema = z.object({
   remainingCount: z.number().int().min(0),
   warningThresholdDays: z.number().int().min(1),
   lastAdjustedAt: isoDateTime,
+  remainingDays: z.number().int().min(0).nullable(),
+  isWarning: z.boolean(),
 });
 
 export const inventoryAdjustmentSchema = z.object({
