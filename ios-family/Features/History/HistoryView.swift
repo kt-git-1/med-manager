@@ -11,6 +11,7 @@ struct HistoryView: View {
     @State private var selectedMode: HistoryMode = .list
     @State private var calendarMonth = Date()
     @State private var selectedDate = Date()
+    private let notificationScheduler = FamilyNotificationScheduler()
 
     var body: some View {
         NavigationStack {
@@ -179,6 +180,7 @@ struct HistoryView: View {
     private func reloadAll() async {
         isLoading = true
         defer { isLoading = false }
+        errorMessage = nil
         selectedPatientId = storedPatientId
         guard !selectedPatientId.isEmpty else {
             adherenceItems = []
@@ -189,7 +191,6 @@ struct HistoryView: View {
     }
 
     private func loadHistory() async {
-        errorMessage = nil
         guard !familyJwtToken.isEmpty, !selectedPatientId.isEmpty else {
             adherenceItems = []
             return
@@ -210,6 +211,7 @@ struct HistoryView: View {
                 selectedDate = latestDate
                 calendarMonth = calendar.startOfDay(for: latestDate)
             }
+            await notifyForNewAdherence(items: adherenceItems)
         } catch {
             errorMessage = "履歴取得に失敗しました。"
         }
@@ -332,6 +334,56 @@ struct HistoryView: View {
         default:
             return nil
         }
+    }
+
+    private func notifyForNewAdherence(items: [FamilyAdherenceLogDTO]) async {
+        guard !selectedPatientId.isEmpty else { return }
+        let takenItems: [(FamilyAdherenceLogDTO, Date)] = items.compactMap { item in
+            guard item.action == "taken", let date = parseDate(item.takenAt) else { return nil }
+            return (item, date)
+        }
+        guard let latest = takenItems.max(by: { $0.1 < $1.1 }) else { return }
+
+        let lastSeen = loadLastSeenTakenAt(for: selectedPatientId)
+        if lastSeen == nil {
+            saveLastSeenTakenAt(latest.1, for: selectedPatientId)
+            return
+        }
+
+        let newlyTaken = takenItems.filter { $0.1 > (lastSeen ?? .distantPast) }
+        guard !newlyTaken.isEmpty else {
+            saveLastSeenTakenAt(latest.1, for: selectedPatientId)
+            return
+        }
+
+        await notificationScheduler.requestAuthorizationIfNeeded()
+        let patientName = storedPatientName.isEmpty ? "患者" : storedPatientName
+        let title = "\(patientName)が服用しました"
+        let body: String
+        if newlyTaken.count == 1 {
+            let medicationName = newlyTaken[0].0.medicationName ?? "お薬"
+            body = "\(medicationName)を服用しました"
+        } else {
+            body = "\(newlyTaken.count)件の服用記録が更新されました"
+        }
+        await notificationScheduler.scheduleImmediateNotification(title: title, body: body)
+        saveLastSeenTakenAt(latest.1, for: selectedPatientId)
+    }
+
+    private func lastSeenKey(for patientId: String) -> String {
+        "familyLastSeenTakenAt_\(patientId)"
+    }
+
+    private func loadLastSeenTakenAt(for patientId: String) -> Date? {
+        guard let value = UserDefaults.standard.string(forKey: lastSeenKey(for: patientId)) else { return nil }
+        return parseDate(value)
+    }
+
+    private func saveLastSeenTakenAt(_ date: Date, for patientId: String) {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let value = formatter.string(from: date)
+        UserDefaults.standard.set(value, forKey: lastSeenKey(for: patientId))
     }
 }
 

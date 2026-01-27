@@ -58,6 +58,15 @@ struct FamilyAdherenceLogDTO: Decodable {
     let medicationName: String?
 }
 
+struct FamilyDoseInstanceDTO: Decodable {
+    let id: String
+    let medicationId: String
+    let scheduleId: String
+    let scheduledFor: String
+    let status: String
+    let medicationName: String?
+}
+
 struct FamilyPaginatedAdherenceDTO: Decodable {
     let items: [FamilyAdherenceLogDTO]
     let nextCursor: String?
@@ -284,6 +293,39 @@ final class FamilyAPIClient {
         var request = URLRequest(url: url)
         attachAuth(to: &request)
         return try await decode(FamilyPaginatedAdherenceDTO.self, request: request)
+    }
+
+    func getDoseInstances(patientId: String, date: String) async throws -> [FamilyDoseInstanceDTO] {
+        let endpoint = baseURL.appendingPathComponent("/patients/\(patientId)/dose-instances")
+        var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false)
+        components?.queryItems = [URLQueryItem(name: "date", value: date)]
+        guard let url = components?.url else { throw FamilyAPIError.invalidBaseURL }
+
+        var request = URLRequest(url: url)
+        attachAuth(to: &request)
+        return try await decode([FamilyDoseInstanceDTO].self, request: request)
+    }
+
+    func createAdherence(
+        patientId: String,
+        doseInstanceId: String,
+        action: String,
+        takenAt: String,
+        clientUuid: String
+    ) async throws -> FamilyAdherenceLogDTO {
+        let endpoint = baseURL.appendingPathComponent("/patients/\(patientId)/adherence")
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        attachAuth(to: &request)
+        let body: [String: String] = [
+            "doseInstanceId": doseInstanceId,
+            "action": action,
+            "takenAt": takenAt,
+            "clientUuid": clientUuid,
+        ]
+        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+        return try await decode(FamilyAdherenceLogDTO.self, request: request)
     }
 
     private func attachAuth(to request: inout URLRequest) {
