@@ -2,7 +2,7 @@ import { queryAdherenceSchema } from "@med/validation";
 import { invalidInput, notFound, unauthorized } from "@/lib/errors";
 import { resolveFamilyCaregiverId } from "@/lib/caregivers";
 import { prisma } from "@/lib/prisma";
-import { serializeAdherenceLog } from "@/lib/serializers";
+import { listAdherenceLogs } from "@/lib/adherence";
 import { withRequestLogging } from "@/lib/requestLogging";
 
 export const runtime = "nodejs";
@@ -37,39 +37,13 @@ export async function GET(
       return invalidInput("Invalid query");
     }
 
-    const limit = query.data.limit ?? 50;
-    const takenAtFilter: { gte?: Date; lte?: Date; lt?: Date } = {};
-    if (query.data.from) {
-      takenAtFilter.gte = new Date(`${query.data.from}T00:00:00.000Z`);
-    }
-    if (query.data.to) {
-      takenAtFilter.lte = new Date(`${query.data.to}T23:59:59.999Z`);
-    }
-    if (query.data.cursor) {
-      takenAtFilter.lt = new Date(query.data.cursor);
-    }
-
-    const items = await prisma.adherenceLog.findMany({
-      where: {
-        patientId,
-        ...(Object.keys(takenAtFilter).length > 0 ? { takenAt: takenAtFilter } : {}),
-      },
-      orderBy: { takenAt: "desc" },
-      take: limit,
-      include: {
-        doseInstance: {
-          select: {
-            medication: { select: { name: true } },
-          },
-        },
-      },
+    const result = await listAdherenceLogs(prisma, {
+      patientId,
+      from: query.data.from,
+      to: query.data.to,
+      cursor: query.data.cursor,
+      limit: query.data.limit,
     });
-
-    const nextCursor =
-      items.length === limit ? items[items.length - 1]?.takenAt?.toISOString() : null;
-    return Response.json(
-      { items: items.map(serializeAdherenceLog), nextCursor },
-      { status: 200 }
-    );
+    return Response.json(result, { status: 200 });
   });
 }

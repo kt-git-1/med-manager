@@ -1,26 +1,24 @@
 import SwiftUI
 
 struct HistoryView: View {
-    let apiBaseURL: String
-    @ObservedObject var sessionStore: PatientSessionStore
-    @State private var adherenceItems: [AdherenceLogDTO] = []
+    @AppStorage("familyJwtToken") private var familyJwtToken: String = ""
+    @AppStorage("familySelectedPatientId") private var storedPatientId: String = ""
+    @State private var patients: [FamilyPatientDTO] = []
+    @State private var selectedPatientId: String = ""
+    @State private var adherenceItems: [FamilyAdherenceLogDTO] = []
     @State private var errorMessage: String?
     @State private var isLoading = false
-    @State private var isActive = false
+    @State private var isLoadingPatients = false
     @State private var selectedMode: HistoryMode = .list
     @State private var calendarMonth = Date()
     @State private var selectedDate = Date()
-    private let refreshTimer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
     var body: some View {
         NavigationStack {
             ZStack {
                 List {
                     headerSection
-                    if let errorMessage {
-                        Text(errorMessage)
-                            .foregroundStyle(.red)
-                    }
+                    patientSection
                     modeSection
                     if selectedMode == .list {
                         historyListSection
@@ -50,25 +48,21 @@ struct HistoryView: View {
             .tint(.teal)
             .listStyle(.insetGrouped)
             .toolbar {
-                Button("ログアウト") {
-                    sessionStore.clear()
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    Button("更新") {
+                        Task { await reloadAll() }
+                    }
+                    .disabled(isLoading)
+                    Button("ログアウト") {
+                        Task { await handleSignOut() }
+                    }
                 }
             }
-            .refreshable {
-                await reload()
-            }
             .task {
-                await reload()
+                await reloadAll()
             }
-            .onReceive(refreshTimer) { _ in
-                guard isActive, !isLoading else { return }
-                Task { await reload() }
-            }
-            .onAppear {
-                isActive = true
-            }
-            .onDisappear {
-                isActive = false
+            .onChange(of: selectedPatientId) { _ in
+                Task { await loadHistory() }
             }
         }
     }
@@ -82,12 +76,40 @@ struct HistoryView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("服薬履歴")
                         .font(.headline)
-                    Text("一覧とカレンダーで確認できます。")
+                    Text("患者の履歴を一覧/カレンダーで確認できます。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
             .padding(.vertical, 4)
+        }
+    }
+
+    private var patientSection: some View {
+        Section(header: Text("対象患者")) {
+            if isLoadingPatients {
+                Text("読み込み中...")
+                    .foregroundStyle(.secondary)
+            } else if patients.isEmpty {
+                Text("患者が見つかりません。連携タブで患者を追加してください。")
+                    .foregroundStyle(.secondary)
+            } else {
+                Picker("患者", selection: $selectedPatientId) {
+                    ForEach(patients, id: \.id) { patient in
+                        Text(patient.displayName).tag(patient.id)
+                    }
+                }
+            }
+            Button("履歴を読み込む") {
+                Task { await loadHistory() }
+            }
+            .buttonStyle(.bordered)
+            .tint(.teal)
+            .disabled(selectedPatientId.isEmpty || familyJwtToken.isEmpty)
+            if let errorMessage {
+                Text(errorMessage)
+                    .foregroundStyle(.red)
+            }
         }
     }
 
@@ -99,6 +121,7 @@ struct HistoryView: View {
                 }
             }
             .pickerStyle(.segmented)
+            .disabled(selectedPatientId.isEmpty)
         }
     }
 
@@ -164,7 +187,7 @@ struct HistoryView: View {
         }
     }
 
-    private func adherenceRow(_ item: AdherenceLogDTO) -> some View {
+    private func adherenceRow(_ item: FamilyAdherenceLogDTO) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(item.medicationName ?? "お薬")
                 .font(.headline)
@@ -193,18 +216,58 @@ struct HistoryView: View {
         }
     }
 
-    private func reload() async {
-        guard !apiBaseURL.isEmpty else {
-            errorMessage = "API_BASE_URLが未設定です。"
-            return
-        }
-        await sessionStore.refreshIfNeeded(apiBaseURL: apiBaseURL)
+    private func handleSignOut() async {
+        await SupabaseAuthService.signOut()
+        familyJwtToken = ""
+        storedPatientId = ""
+        selectedPatientId = ""
+    }
+
+    private func reloadAll() async {
         isLoading = true
         defer { isLoading = false }
+        await loadPatients()
+        await loadHistory()
+    }
+
+    private func loadPatients() async {
         errorMessage = nil
+        isLoadingPatients = true
+        defer { isLoadingPatients = false }
+        guard !familyJwtToken.isEmpty else {
+            patients = []
+            selectedPatientId = ""
+            return
+        }
         do {
-            let client = try APIClient(baseURLString: apiBaseURL, keychain: KeychainStore())
-            let response = try await client.getAdherence(from: nil, to: nil, cursor: nil, limit: 30)
+            let client = try FamilyAPIClient(token: familyJwtToken)
+            let result = try await client.listPatients()
+            patients = result
+            if !storedPatientId.isEmpty, result.contains(where: { $0.id == storedPatientId }) {
+                selectedPatientId = storedPatientId
+            } else if selectedPatientId.isEmpty, let first = result.first?.id {
+                selectedPatientId = first
+            }
+        } catch {
+            errorMessage = "患者一覧の取得に失敗しました。"
+        }
+    }
+
+    private func loadHistory() async {
+        errorMessage = nil
+        guard !familyJwtToken.isEmpty, !selectedPatientId.isEmpty else {
+            adherenceItems = []
+            return
+        }
+        do {
+            let client = try FamilyAPIClient(token: familyJwtToken)
+            let response = try await client.getAdherence(
+                patientId: selectedPatientId,
+                from: nil,
+                to: nil,
+                cursor: nil,
+                limit: 60
+            )
             adherenceItems = response.items.sorted {
                 (parseDate($0.takenAt) ?? .distantPast) > (parseDate($1.takenAt) ?? .distantPast)
             }
@@ -212,6 +275,7 @@ struct HistoryView: View {
                 selectedDate = latestDate
                 calendarMonth = calendar.startOfDay(for: latestDate)
             }
+            storedPatientId = selectedPatientId
         } catch {
             errorMessage = "履歴取得に失敗しました。"
         }
@@ -291,7 +355,7 @@ struct HistoryView: View {
         }
     }
 
-    private func itemsForDate(_ date: Date) -> [AdherenceLogDTO] {
+    private func itemsForDate(_ date: Date) -> [FamilyAdherenceLogDTO] {
         adherenceItems.filter { item in
             guard let parsed = parseDate(item.takenAt) else { return false }
             return calendar.isDate(parsed, inSameDayAs: date)
@@ -345,5 +409,5 @@ private enum HistoryMode: String, CaseIterable, Identifiable {
 }
 
 #Preview {
-    HistoryView(apiBaseURL: "http://localhost:3000", sessionStore: PatientSessionStore())
+    HistoryView()
 }

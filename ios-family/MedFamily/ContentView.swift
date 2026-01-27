@@ -18,6 +18,10 @@ struct ContentView: View {
                         .tabItem {
                             Label("予定", systemImage: "clock")
                         }
+                    HistoryView()
+                        .tabItem {
+                            Label("履歴", systemImage: "calendar")
+                        }
                     LinkingCodeView()
                         .tabItem {
                             Label("患者/連携", systemImage: "person.badge.plus")

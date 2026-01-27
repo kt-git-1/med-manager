@@ -45,6 +45,22 @@ struct InventoryDTO: Decodable {
     let lastAdjustedAt: String
 }
 
+struct FamilyAdherenceLogDTO: Decodable {
+    let id: String
+    let doseInstanceId: String
+    let patientId: String
+    let action: String
+    let takenAt: String
+    let source: String
+    let clientUuid: String
+    let medicationName: String?
+}
+
+struct FamilyPaginatedAdherenceDTO: Decodable {
+    let items: [FamilyAdherenceLogDTO]
+    let nextCursor: String?
+}
+
 final class FamilyAPIClient {
     private let baseURL: URL
     private let token: String
@@ -237,6 +253,28 @@ final class FamilyAPIClient {
         if let ttlMinutes { body["ttlMinutes"] = ttlMinutes }
         request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
         return try await decode(LinkCodeDTO.self, request: request)
+    }
+
+    func getAdherence(
+        patientId: String,
+        from: String?,
+        to: String?,
+        cursor: String?,
+        limit: Int?
+    ) async throws -> FamilyPaginatedAdherenceDTO {
+        let endpoint = baseURL.appendingPathComponent("/patients/\(patientId)/adherence")
+        var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false)
+        var items: [URLQueryItem] = []
+        if let from { items.append(URLQueryItem(name: "from", value: from)) }
+        if let to { items.append(URLQueryItem(name: "to", value: to)) }
+        if let cursor { items.append(URLQueryItem(name: "cursor", value: cursor)) }
+        if let limit { items.append(URLQueryItem(name: "limit", value: String(limit))) }
+        components?.queryItems = items
+        guard let url = components?.url else { throw FamilyAPIError.invalidBaseURL }
+
+        var request = URLRequest(url: url)
+        attachAuth(to: &request)
+        return try await decode(FamilyPaginatedAdherenceDTO.self, request: request)
     }
 
     private func attachAuth(to request: inout URLRequest) {
