@@ -17,7 +17,7 @@ struct ContentView: View {
                         .tabItem {
                             Label("今日", systemImage: "checkmark.circle")
                         }
-                    HistoryView(sessionStore: sessionStore)
+                    HistoryView(apiBaseURL: apiBaseURL, sessionStore: sessionStore)
                         .tabItem {
                             Label("履歴", systemImage: "calendar")
                         }

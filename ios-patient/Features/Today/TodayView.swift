@@ -6,6 +6,7 @@ struct TodayView: View {
     @State private var doseInstances: [DoseInstanceDTO] = []
     @State private var errorMessage: String?
     @State private var isLoading = false
+    @State private var sendingIds: Set<String> = []
     private let offlineQueue = OfflineQueue()
     private let scheduler = NotificationScheduler()
 
@@ -37,19 +38,47 @@ struct TodayView: View {
                     } else {
                         ForEach(doseInstances, id: \.id) { item in
                             VStack(alignment: .leading, spacing: 8) {
-                                Text(formatTime(item.scheduledFor))
+                                Text(item.medicationName ?? "お薬")
                                     .font(.headline)
-                                HStack {
-                                    Button("服用済み") {
-                                        Task { await sendAdherence(item, action: "taken") }
+                                HStack(spacing: 8) {
+                                    Text(formatTime(item.scheduledFor))
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                    if let timeSlot = formatTimeSlot(item.scheduledFor),
+                                       let presetLabel = presetLabel(for: timeSlot) {
+                                        Text(presetLabel)
+                                            .font(.caption)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(.teal.opacity(0.12))
+                                            .clipShape(Capsule())
+                                            .foregroundStyle(.teal)
                                     }
-                                    .buttonStyle(.borderedProminent)
-                                    .tint(.teal)
-                                    Button("スキップ") {
-                                        Task { await sendAdherence(item, action: "skipped") }
+                                }
+                                if item.status == "taken" {
+                                    Label("服用済み", systemImage: "checkmark.circle.fill")
+                                        .foregroundStyle(.green)
+                                } else if item.status == "skipped" {
+                                    Label("スキップ済み", systemImage: "minus.circle.fill")
+                                        .foregroundStyle(.secondary)
+                                } else {
+                                    HStack {
+                                        Button("服用済み") {
+                                            Task { await sendAdherence(item, action: "taken") }
+                                        }
+                                        .buttonStyle(.borderedProminent)
+                                        .tint(.teal)
+                                        .disabled(sendingIds.contains(item.id) || isLoading)
+                                        Button("スキップ") {
+                                            Task { await sendAdherence(item, action: "skipped") }
+                                        }
+                                        .buttonStyle(.bordered)
+                                        .tint(.teal)
+                                        .disabled(sendingIds.contains(item.id) || isLoading)
+                                        if sendingIds.contains(item.id) {
+                                            ProgressView()
+                                        }
                                     }
-                                    .buttonStyle(.bordered)
-                                    .tint(.teal)
                                 }
                             }
                         }
@@ -102,6 +131,20 @@ struct TodayView: View {
     }
 
     private func sendAdherence(_ item: DoseInstanceDTO, action: String) async {
+        await MainActor.run {
+            sendingIds.insert(item.id)
+            doseInstances = doseInstances.map { instance in
+                guard instance.id == item.id else { return instance }
+                return DoseInstanceDTO(
+                    id: instance.id,
+                    medicationId: instance.medicationId,
+                    scheduleId: instance.scheduleId,
+                    scheduledFor: instance.scheduledFor,
+                    status: action == "taken" ? "taken" : "skipped",
+                    medicationName: instance.medicationName
+                )
+            }
+        }
         await sessionStore.refreshIfNeeded(apiBaseURL: apiBaseURL)
         do {
             let client = try APIClient(baseURLString: apiBaseURL, keychain: KeychainStore())
@@ -118,6 +161,9 @@ struct TodayView: View {
                 clientUuid: payload["clientUuid"] ?? UUID().uuidString
             )
             await reload()
+            await MainActor.run {
+                sendingIds.remove(item.id)
+            }
             return
         } catch {
             let payload = [
@@ -131,6 +177,9 @@ struct TodayView: View {
                 errorMessage = "オフラインのため送信待ちに保存しました。"
             } else {
                 errorMessage = "送信に失敗しました。"
+            }
+            await MainActor.run {
+                sendingIds.remove(item.id)
             }
         }
     }
@@ -184,9 +233,32 @@ struct TodayView: View {
     private func formatTime(_ value: String) -> String {
         guard let date = parseDate(value) else { return value }
         let formatter = DateFormatter()
-        formatter.timeStyle = .short
-        formatter.dateStyle = .none
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "ja_JP")
+        formatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
+        formatter.dateFormat = "yyyy-MM-dd/HH:mm"
         return formatter.string(from: date)
+    }
+
+    private func formatTimeSlot(_ value: String) -> String? {
+        guard let date = parseDate(value) else { return nil }
+        let formatter = DateFormatter()
+        formatter.timeZone = TimeZone.current
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date)
+    }
+
+    private func presetLabel(for timeSlot: String) -> String? {
+        switch timeSlot {
+        case "08:00":
+            return "朝"
+        case "12:00":
+            return "昼"
+        case "20:00":
+            return "夜"
+        default:
+            return nil
+        }
     }
 }
 

@@ -16,6 +16,7 @@ struct DoseInstanceDTO: Decodable {
     let scheduleId: String
     let scheduledFor: String
     let status: String
+    let medicationName: String?
 }
 
 struct AdherenceLogDTO: Decodable {
@@ -26,6 +27,7 @@ struct AdherenceLogDTO: Decodable {
     let takenAt: String
     let source: String
     let clientUuid: String
+    let medicationName: String?
 }
 
 struct PaginatedAdherenceDTO: Decodable {

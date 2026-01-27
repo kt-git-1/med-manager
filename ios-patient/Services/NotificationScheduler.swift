@@ -49,6 +49,7 @@ final class NotificationScheduler {
         }
     }
 
+
     func clearAll() async {
         let identifiers = await center.pendingNotificationRequests().map { $0.identifier }
         center.removePendingNotificationRequests(withIdentifiers: identifiers)

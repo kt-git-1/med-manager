@@ -141,6 +141,14 @@ final class FamilyAPIClient {
         return try await decode(FamilyMedicationDTO.self, request: request)
     }
 
+    func deleteMedication(medicationId: String) async throws {
+        let endpoint = baseURL.appendingPathComponent("/medications/\(medicationId)")
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "DELETE"
+        attachAuth(to: &request)
+        try await sendNoContent(request: request)
+    }
+
     func listSchedules(patientId: String) async throws -> [FamilyScheduleDTO] {
         let endpoint = baseURL.appendingPathComponent("/patients/\(patientId)/schedules")
         var request = URLRequest(url: endpoint)
@@ -267,6 +275,27 @@ final class FamilyAPIClient {
                 )
                 throw error
             }
+        } catch {
+            AppLogger.api.error(
+                "Request failed \(method, privacy: .public) \(path, privacy: .public): \(error.localizedDescription, privacy: .public)"
+            )
+            throw error
+        }
+    }
+
+    private func sendNoContent(request: URLRequest) async throws {
+        let start = Date()
+        let method = request.httpMethod ?? "GET"
+        let path = request.url?.path ?? "-"
+        let query = request.url?.query.map { "?\($0)" } ?? ""
+        AppLogger.api.info("Request \(method, privacy: .public) \(path, privacy: .public)\(query, privacy: .public)")
+        do {
+            let (_, response) = try await URLSession.shared.data(for: request)
+            let status = (response as? HTTPURLResponse)?.statusCode ?? -1
+            let durationMs = Int(Date().timeIntervalSince(start) * 1000)
+            AppLogger.api.info(
+                "Response \(method, privacy: .public) \(path, privacy: .public) status=\(status, privacy: .public) ms=\(durationMs, privacy: .public)"
+            )
         } catch {
             AppLogger.api.error(
                 "Request failed \(method, privacy: .public) \(path, privacy: .public): \(error.localizedDescription, privacy: .public)"

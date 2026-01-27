@@ -4,6 +4,7 @@ import { invalidInput, unauthorized } from "@/lib/errors";
 import { hashPatientToken } from "@/lib/patientTokens";
 import { prisma } from "@/lib/prisma";
 import { applyInventoryDecrement } from "@/lib/inventory";
+import { serializeAdherenceLog } from "@/lib/serializers";
 import { withRequestLogging } from "@/lib/requestLogging";
 
 export const runtime = "nodejs";
@@ -66,11 +67,21 @@ export async function GET(request: Request): Promise<Response> {
       },
       orderBy: { takenAt: "desc" },
       take: limit,
+      include: {
+        doseInstance: {
+          select: {
+            medication: { select: { name: true } },
+          },
+        },
+      },
     });
 
     const nextCursor =
       items.length === limit ? items[items.length - 1]?.takenAt?.toISOString() : null;
-    return Response.json({ items, nextCursor }, { status: 200 });
+    return Response.json(
+      { items: items.map(serializeAdherenceLog), nextCursor },
+      { status: 200 }
+    );
   });
 }
 

@@ -140,5 +140,10 @@ export async function listDoseInstancesForDate(
       },
     },
     orderBy: { scheduledFor: "asc" },
+    include: {
+      medication: {
+        select: { name: true },
+      },
+    },
   });
 }

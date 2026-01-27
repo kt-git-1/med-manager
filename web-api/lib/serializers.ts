@@ -1,4 +1,11 @@
-import type { DoseInstance, Inventory, Medication, Patient, Schedule } from "@/prisma/generated";
+import type {
+  AdherenceLog,
+  DoseInstance,
+  Inventory,
+  Medication,
+  Patient,
+  Schedule,
+} from "@/prisma/generated";
 import { formatISODate, formatTimeOfDay } from "./dates";
 
 export function serializePatient(patient: Patient) {
@@ -35,13 +42,18 @@ export function serializeSchedule(schedule: Schedule) {
   };
 }
 
-export function serializeDoseInstance(instance: DoseInstance) {
+type DoseInstanceWithMedication = DoseInstance & {
+  medication?: { name: string } | null;
+};
+
+export function serializeDoseInstance(instance: DoseInstanceWithMedication) {
   return {
     id: instance.id,
     medicationId: instance.medicationId,
     scheduleId: instance.scheduleId,
     scheduledFor: instance.scheduledFor.toISOString(),
     status: instance.status,
+    medicationName: instance.medication?.name ?? null,
   };
 }
 
@@ -51,5 +63,22 @@ export function serializeInventory(inventory: Inventory) {
     remainingCount: inventory.remainingCount,
     warningThresholdDays: inventory.warningThresholdDays,
     lastAdjustedAt: inventory.lastAdjustedAt.toISOString(),
+  };
+}
+
+type AdherenceLogWithMedication = AdherenceLog & {
+  doseInstance?: { medication?: { name: string } | null } | null;
+};
+
+export function serializeAdherenceLog(log: AdherenceLogWithMedication) {
+  return {
+    id: log.id,
+    doseInstanceId: log.doseInstanceId,
+    patientId: log.patientId,
+    action: log.action,
+    takenAt: log.takenAt.toISOString(),
+    source: log.source,
+    clientUuid: log.clientUuid,
+    medicationName: log.doseInstance?.medication?.name ?? null,
   };
 }
