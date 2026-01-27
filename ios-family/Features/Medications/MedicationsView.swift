@@ -43,6 +43,7 @@ struct MedicationsView: View {
                     }
                 }
                 .animation(.easeInOut(duration: 0.2), value: showToast)
+                .disabled(isLoading)
                 .sheet(item: $editingItem) { item in
                     MedicationEditSheet(
                         medication: item.medication,
@@ -73,6 +74,7 @@ struct MedicationsView: View {
                     .shadow(radius: 8)
                 }
             }
+            .blockTabBarInteraction(isLoading)
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Button("更新") {
@@ -82,6 +84,7 @@ struct MedicationsView: View {
                     Button("ログアウト") {
                         Task { await handleSignOut() }
                     }
+                    .disabled(isLoading)
                 }
             }
             .task {
@@ -642,6 +645,7 @@ private struct MedicationEditSheet: View {
                     }
                 }
             }
+            .disabled(isSaving)
             .navigationTitle("薬を編集")
             .tint(.teal)
             .toolbar {
@@ -649,6 +653,7 @@ private struct MedicationEditSheet: View {
                     Button("閉じる") {
                         dismiss()
                     }
+                    .disabled(isSaving)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(isSaving ? "保存中..." : "保存") {

@@ -6,6 +6,7 @@ import UIKit
 struct ContentView: View {
     @StateObject private var sessionStore = PatientSessionStore()
     @State private var hasBootstrapped = false
+    @State private var isTabInteractionBlocked = false
 
     private var apiBaseURL: String {
         Bundle.main.object(forInfoDictionaryKey: "API_BASE_URL") as? String ?? ""
@@ -27,6 +28,15 @@ struct ContentView: View {
                         }
                 }
                 .tint(.teal)
+                .overlay {
+                    if isTabInteractionBlocked {
+                        Color.black.opacity(0.001)
+                            .ignoresSafeArea()
+                    }
+                }
+                .onPreferenceChange(TabBarInteractionPreferenceKey.self) { value in
+                    isTabInteractionBlocked = value
+                }
             }
         }
         .dismissKeyboardOnTap()

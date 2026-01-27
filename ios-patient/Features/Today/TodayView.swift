@@ -113,6 +113,7 @@ struct TodayView: View {
                     .shadow(radius: 8)
                 }
             }
+            .blockTabBarInteraction(isLoading)
             .navigationTitle("今日")
             .tint(.teal)
             .listStyle(.insetGrouped)

@@ -104,6 +104,7 @@ struct LinkingCodeView: View {
                     }
                 }
                 .animation(.easeInOut(duration: 0.2), value: showCopyToast)
+                .disabled(isLoading)
                 if isLoading {
                     Color.black.opacity(0.2)
                         .ignoresSafeArea()
@@ -122,6 +123,7 @@ struct LinkingCodeView: View {
                     .shadow(radius: 8)
                 }
             }
+            .blockTabBarInteraction(isLoading)
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Button("更新") {
@@ -131,6 +133,7 @@ struct LinkingCodeView: View {
                     Button("ログアウト") {
                         Task { await handleSignOut() }
                     }
+                    .disabled(isLoading)
                 }
             }
             .task {

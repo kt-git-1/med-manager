@@ -28,6 +28,7 @@ struct HistoryView: View {
                         calendarSection
                     }
                 }
+                .disabled(isLoading)
                 if isLoading {
                     Color.black.opacity(0.2)
                         .ignoresSafeArea()
@@ -46,6 +47,7 @@ struct HistoryView: View {
                     .shadow(radius: 8)
                 }
             }
+            .blockTabBarInteraction(isLoading)
             .navigationTitle("履歴")
             .tint(.teal)
             .listStyle(.insetGrouped)
@@ -53,6 +55,7 @@ struct HistoryView: View {
                 Button("ログアウト") {
                     sessionStore.clear()
                 }
+                .disabled(isLoading)
             }
             .refreshable {
                 await reload()

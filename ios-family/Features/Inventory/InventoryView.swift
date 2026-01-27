@@ -39,6 +39,7 @@ struct InventoryView: View {
                     .shadow(radius: 8)
                 }
             }
+            .blockTabBarInteraction(isLoading)
             .navigationTitle("在庫")
             .tint(.teal)
             .listStyle(.insetGrouped)

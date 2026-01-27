@@ -6,6 +6,7 @@ import UIKit
 struct ContentView: View {
     @AppStorage("familyJwtToken") private var familyJwtToken: String = ""
     @State private var hasBootstrapped = false
+    @State private var isTabInteractionBlocked = false
 
     var body: some View {
         Group {
@@ -35,6 +36,15 @@ struct ContentView: View {
                         }
                 }
                 .tint(.teal)
+                .overlay {
+                    if isTabInteractionBlocked {
+                        Color.black.opacity(0.001)
+                            .ignoresSafeArea()
+                    }
+                }
+                .onPreferenceChange(TabBarInteractionPreferenceKey.self) { value in
+                    isTabInteractionBlocked = value
+                }
             }
         }
         .dismissKeyboardOnTap()

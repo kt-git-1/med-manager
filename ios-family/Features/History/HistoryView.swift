@@ -38,8 +38,10 @@ struct HistoryView: View {
                         calendarSection
                     }
                 }
+                .disabled(isLoading)
                 FamilyLoadingOverlay(isLoading: isLoading)
             }
+            .blockTabBarInteraction(isLoading)
             .navigationTitle("履歴")
             .tint(.teal)
             .listStyle(.insetGrouped)
@@ -52,6 +54,7 @@ struct HistoryView: View {
                     Button("ログアウト") {
                         Task { await handleSignOut() }
                     }
+                    .disabled(isLoading)
                 }
             }
             .task {
