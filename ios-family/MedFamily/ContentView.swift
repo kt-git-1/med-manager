@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @AppStorage("familyJwtToken") private var familyJwtToken: String = ""
+    @State private var hasBootstrapped = false
 
     var body: some View {
         Group {
@@ -26,6 +27,8 @@ struct ContentView: View {
             }
         }
         .onAppear {
+            guard !hasBootstrapped else { return }
+            hasBootstrapped = true
             Task {
                 await SupabaseAuthService.restoreSessionIfNeeded()
             }

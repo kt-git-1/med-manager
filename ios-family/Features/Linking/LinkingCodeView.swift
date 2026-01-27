@@ -12,135 +12,128 @@ struct LinkingCodeView: View {
     @State private var expiresAt: String = ""
     @State private var errorMessage: String?
     @State private var showCopyToast = false
+    @State private var isLoading = false
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    HStack(spacing: 12) {
-                        Image(systemName: "link.circle.fill")
-                            .foregroundStyle(.white, .teal)
-                            .font(.title2)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("連携コードを発行")
-                                .font(.headline)
-                            Text("新規作成か既存患者を選択して発行します。")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
-
-                Section(header: Text("新しい患者")) {
-                    TextField("表示名", text: $newPatientName)
-                    Button(isCreating ? "作成中..." : "追加して連携コード発行") {
-                        Task { await createPatientAndIssueCode() }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.teal)
-                    .disabled(
-                        isCreating ||
-                        newPatientName.isEmpty ||
-                        familyJwtToken.isEmpty
-                    )
-                }
-
-                Section(header: Text("既存患者から発行")) {
-                    if isLoadingPatients {
-                        Text("読み込み中...")
-                            .foregroundStyle(.secondary)
-                    } else if patients.isEmpty {
-                        Text("患者が見つかりません。先に患者を追加してください。")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Picker("患者", selection: $selectedPatientId) {
-                            ForEach(patients, id: \.id) { patient in
-                                Text(patient.displayName).tag(patient.id)
-                            }
-                        }
-                    }
-                    Button("連携コードを発行") {
-                        Task { await issueCode() }
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.teal)
-                    .disabled(selectedPatientId.isEmpty || familyJwtToken.isEmpty)
-                }
-                Section(header: Text("患者一覧")) {
-                    if isLoadingPatients {
-                        Text("読み込み中...")
-                            .foregroundStyle(.secondary)
-                    } else if patients.isEmpty {
-                        Text("まだ患者が登録されていません。")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(patients, id: \.id) { patient in
+            ZStack {
+                Form {
+                    Section {
+                        HStack(spacing: 12) {
+                            Image(systemName: "link.circle.fill")
+                                .foregroundStyle(.white, .teal)
+                                .font(.title2)
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(patient.displayName)
+                                Text("連携コードを発行")
                                     .font(.headline)
-                                Text(patient.timezone)
+                                Text("新規作成か既存患者を選択して発行します。")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
-                            .padding(.vertical, 4)
-                            .onTapGesture {
-                                selectedPatientId = patient.id
+                        }
+                        .padding(.vertical, 4)
+                    }
+
+                    Section(header: Text("患者一覧")) {
+                        if isLoadingPatients {
+                            Text("読み込み中...")
+                                .foregroundStyle(.secondary)
+                        } else if patients.isEmpty {
+                            Text("まだ患者が登録されていません。")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Picker("患者", selection: $selectedPatientId) {
+                                ForEach(patients, id: \.id) { patient in
+                                    Text(patient.displayName).tag(patient.id)
+                                }
                             }
                         }
+                        Button("選択中の患者で連携コードを発行") {
+                            Task { await issueCode() }
+                        }
+                        .buttonStyle(.bordered)
+                        .tint(.teal)
+                        .disabled(selectedPatientId.isEmpty || familyJwtToken.isEmpty)
                     }
-                }
-                Section(header: Text("連携コード")) {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text(code)
-                            .font(.title)
-                            .monospacedDigit()
-                        if !expiresAt.isEmpty {
-                            Text("有効期限: \(expiresAt)")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
+                    Section(header: Text("新しい患者を追加")) {
+                        TextField("表示名", text: $newPatientName)
+                        Button(isCreating ? "作成中..." : "追加して連携コード発行") {
+                            Task { await createPatientAndIssueCode() }
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.teal)
+                        .disabled(
+                            isCreating ||
+                            newPatientName.isEmpty ||
+                            familyJwtToken.isEmpty
+                        )
+                    }
+                    if code != "------" || !expiresAt.isEmpty || errorMessage != nil {
+                        Section(header: Text("連携コード")) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text(code)
+                                .font(.title)
+                                .monospacedDigit()
+                            if !expiresAt.isEmpty {
+                                Text("有効期限: \(expiresAt)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        Button("コピー") {
+                            UIPasteboard.general.string = code
+                            showCopyToast = true
+                            scheduleToastDismiss()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.teal)
+                        .disabled(code == "------")
+                        if let errorMessage {
+                            Text(errorMessage).foregroundStyle(.red)
                         }
                     }
-                    Button("コピー") {
-                        UIPasteboard.general.string = code
-                        showCopyToast = true
-                        scheduleToastDismiss()
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.teal)
-                    .disabled(code == "------")
-                    if let errorMessage {
-                        Text(errorMessage).foregroundStyle(.red)
                     }
                 }
-            }
-            .navigationTitle("連携")
-            .tint(.teal)
-            .listStyle(.insetGrouped)
-            .overlay(alignment: .bottom) {
-                if showCopyToast {
-                    Text("連携コードをコピーしました")
-                        .font(.subheadline)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .padding(.bottom, 24)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                .navigationTitle("連携")
+                .tint(.teal)
+                .listStyle(.insetGrouped)
+                .overlay(alignment: .bottom) {
+                    if showCopyToast {
+                        ToastBanner(message: "連携コードをコピーしました")
+                    }
+                }
+                .animation(.easeInOut(duration: 0.2), value: showCopyToast)
+                if isLoading {
+                    Color.black.opacity(0.2)
+                        .ignoresSafeArea()
+                    VStack(spacing: 12) {
+                        Image("AppLogo")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 64, height: 64)
+                        ProgressView()
+                        Text("更新中")
+                            .font(.headline)
+                    }
+                    .padding(20)
+                    .background(.ultraThinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .shadow(radius: 8)
                 }
             }
-            .animation(.easeInOut(duration: 0.2), value: showCopyToast)
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Button("更新") {
-                        Task { await loadPatients() }
+                        Task { await reloadAll() }
                     }
+                    .disabled(isLoading)
                     Button("ログアウト") {
                         Task { await handleSignOut() }
                     }
                 }
             }
             .task {
-                await loadPatients()
+                await reloadAll()
             }
         }
     }
@@ -208,6 +201,12 @@ struct LinkingCodeView: View {
             try? await Task.sleep(for: .seconds(2))
             showCopyToast = false
         }
+    }
+
+    private func reloadAll() async {
+        isLoading = true
+        defer { isLoading = false }
+        await loadPatients()
     }
 }
 

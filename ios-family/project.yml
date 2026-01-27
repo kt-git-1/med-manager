@@ -18,7 +18,9 @@ targets:
     sources:
       - MedFamily
       - Features
+      - Components
       - Services
+      - Assets.xcassets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.medmanager.family

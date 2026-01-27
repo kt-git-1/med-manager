@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ContentView: View {
     @StateObject private var sessionStore = PatientSessionStore()
+    @State private var hasBootstrapped = false
 
     private var apiBaseURL: String {
         Bundle.main.object(forInfoDictionaryKey: "API_BASE_URL") as? String ?? ""
@@ -26,7 +27,9 @@ struct ContentView: View {
             }
         }
         .onAppear {
-            sessionStore.load()
+            guard !hasBootstrapped else { return }
+            hasBootstrapped = true
+            sessionStore.loadAsync()
             Task {
                 await sessionStore.refreshIfNeeded(apiBaseURL: apiBaseURL)
                 sessionStore.startAutoRefresh(apiBaseURL: apiBaseURL)

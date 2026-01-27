@@ -6,94 +6,121 @@ struct SchedulesView: View {
     @State private var patients: [FamilyPatientDTO] = []
     @State private var selectedPatientId: String = ""
     @State private var isLoadingPatients = false
+    @State private var medications: [FamilyMedicationDTO] = []
     @State private var schedules: [FamilyScheduleDTO] = []
     @State private var errorMessage: String?
+    @State private var isLoading = false
 
     var body: some View {
         NavigationStack {
-            Form {
-                Section {
-                    HStack(spacing: 12) {
-                        Image(systemName: "clock.fill")
-                            .foregroundStyle(.white, .teal)
-                            .font(.title2)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("予定を管理")
-                                .font(.headline)
-                            Text("患者を選択して予定を追加します。")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
-
-                Section(header: Text("対象患者")) {
-                    if isLoadingPatients {
-                        Text("読み込み中...")
-                            .foregroundStyle(.secondary)
-                    } else if patients.isEmpty {
-                        Text("患者が見つかりません。連携タブで患者を追加してください。")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        Picker("患者", selection: $selectedPatientId) {
-                            ForEach(patients, id: \.id) { patient in
-                                Text(patient.displayName).tag(patient.id)
-                            }
-                        }
-                    }
-                }
-                Section(header: Text("予定一覧")) {
-                    if let errorMessage {
-                        Text(errorMessage).foregroundStyle(.red)
-                    }
-                    if schedules.isEmpty {
-                        Text("まだ予定が登録されていません。")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(schedules, id: \.id) { schedule in
+            ZStack {
+                Form {
+                    Section {
+                        HStack(spacing: 12) {
+                            Image(systemName: "clock.fill")
+                                .foregroundStyle(.white, .teal)
+                                .font(.title2)
                             VStack(alignment: .leading, spacing: 4) {
-                                Text(schedule.timeSlots.joined(separator: " / "))
+                                Text("予定を管理")
                                     .font(.headline)
-                                Text("開始日: \(schedule.startDate)")
+                                Text("患者を選択して予定を追加します。")
                                     .font(.caption)
                                     .foregroundStyle(.secondary)
                             }
-                            .padding(.vertical, 4)
                         }
+                        .padding(.vertical, 4)
                     }
-                }
-            }
-            .navigationTitle("予定")
-            .tint(.teal)
-            .listStyle(.insetGrouped)
-            .toolbar {
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    Button("更新") {
-                        Task {
-                            await loadPatients()
-                            if !selectedPatientId.isEmpty {
-                                await loadSchedules()
+
+                    Section(header: Text("対象患者")) {
+                        if isLoadingPatients {
+                            Text("読み込み中...")
+                                .foregroundStyle(.secondary)
+                        } else if patients.isEmpty {
+                            Text("患者が見つかりません。連携タブで患者を追加してください。")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Picker("患者", selection: $selectedPatientId) {
+                                ForEach(patients, id: \.id) { patient in
+                                    Text(patient.displayName).tag(patient.id)
+                                }
                             }
                         }
                     }
+                    Section(header: Text("予定一覧")) {
+                        if let errorMessage {
+                            Text(errorMessage).foregroundStyle(.red)
+                        }
+                        if schedules.isEmpty {
+                            Text("まだ予定が登録されていません。")
+                                .foregroundStyle(.secondary)
+                        } else {
+                            ForEach(schedules, id: \.id) { schedule in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    if let medicationName = medicationName(for: schedule.medicationId) {
+                                        Text(medicationName)
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                    } else {
+                                        Text("薬名: 取得中...")
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Text(schedule.timeSlots.joined(separator: " / "))
+                                        .font(.headline)
+                                    Text("開始日: \(schedule.startDate)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                .padding(.vertical, 4)
+                            }
+                        }
+                    }
+                }
+                .navigationTitle("予定")
+                .tint(.teal)
+                .listStyle(.insetGrouped)
+                if isLoading {
+                    Color.black.opacity(0.2)
+                        .ignoresSafeArea()
+                    VStack(spacing: 12) {
+                        Image("AppLogo")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 64, height: 64)
+                        ProgressView()
+                        Text("更新中")
+                            .font(.headline)
+                    }
+                    .padding(20)
+                    .background(.ultraThinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .shadow(radius: 8)
+                }
+            }
+            .toolbar {
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    Button("更新") {
+                        Task { await reloadAll() }
+                    }
+                    .disabled(isLoading)
                     Button("ログアウト") {
                         Task { await handleSignOut() }
                     }
                 }
             }
             .task {
-                await loadPatients()
-                if !selectedPatientId.isEmpty {
-                    await loadSchedules()
-                }
+                await reloadAll()
             }
             .onChange(of: selectedPatientId) { newValue in
                 guard !newValue.isEmpty else {
+                    medications = []
                     schedules = []
                     return
                 }
-                Task { await loadSchedules() }
+                Task {
+                    await loadMedications()
+                    await loadSchedules()
+                }
             }
         }
     }
@@ -132,6 +159,30 @@ struct SchedulesView: View {
         } catch {
             errorMessage = "予定一覧の取得に失敗しました。"
         }
+    }
+
+    private func loadMedications() async {
+        do {
+            let client = try FamilyAPIClient(token: familyJwtToken)
+            medications = try await client.listMedications(patientId: selectedPatientId)
+        } catch {
+            medications = []
+        }
+    }
+
+    private func reloadAll() async {
+        isLoading = true
+        defer { isLoading = false }
+        await loadPatients()
+        if !selectedPatientId.isEmpty {
+            await loadMedications()
+            await loadSchedules()
+        }
+    }
+
+    private func medicationName(for medicationId: String) -> String? {
+        medications.first(where: { $0.id == medicationId })
+            .map { "\($0.name) \($0.dosage)" }
     }
 
 }

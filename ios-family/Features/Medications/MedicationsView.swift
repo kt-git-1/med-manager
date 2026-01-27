@@ -21,64 +21,69 @@ struct MedicationsView: View {
     @State private var showToast = false
     @State private var toastMessage = ""
     @State private var editingItem: MedicationEditItem?
+    @State private var isLoading = false
 
     var body: some View {
         NavigationStack {
-            Form {
-                headerSection
-                patientSection
-                listSection
-                addSection
-            }
-            .navigationTitle("薬")
-            .tint(.teal)
-            .listStyle(.insetGrouped)
-            .overlay(alignment: .bottom) {
-                if showToast {
-                    Text(toastMessage)
-                        .font(.subheadline)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 10)
-                        .background(.ultraThinMaterial, in: Capsule())
-                        .padding(.bottom, 24)
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+            ZStack {
+                Form {
+                    headerSection
+                    patientSection
+                    listSection
+                    addSection
                 }
-            }
-            .animation(.easeInOut(duration: 0.2), value: showToast)
-            .sheet(item: $editingItem) { item in
-                MedicationEditSheet(
-                    medication: item.medication,
-                    schedule: item.schedule,
-                    onSave: { result in
-                        await saveMedicationEdit(result)
-                    },
-                    onDelete: { medicationId in
-                        await deleteMedication(medicationId)
+                .navigationTitle("薬")
+                .tint(.teal)
+                .listStyle(.insetGrouped)
+                .overlay(alignment: .bottom) {
+                    if showToast {
+                        ToastBanner(message: toastMessage)
                     }
-                )
+                }
+                .animation(.easeInOut(duration: 0.2), value: showToast)
+                .sheet(item: $editingItem) { item in
+                    MedicationEditSheet(
+                        medication: item.medication,
+                        schedule: item.schedule,
+                        onSave: { result in
+                            await saveMedicationEdit(result)
+                        },
+                        onDelete: { medicationId in
+                            await deleteMedication(medicationId)
+                        }
+                    )
+                }
+                if isLoading {
+                    Color.black.opacity(0.2)
+                        .ignoresSafeArea()
+                    VStack(spacing: 12) {
+                        Image("AppLogo")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 64, height: 64)
+                        ProgressView()
+                        Text("更新中")
+                            .font(.headline)
+                    }
+                    .padding(20)
+                    .background(.ultraThinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .shadow(radius: 8)
+                }
             }
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Button("更新") {
-                        Task {
-                            await loadPatients()
-                            if !selectedPatientId.isEmpty {
-                                await loadMedications()
-                                await loadSchedules()
-                            }
-                        }
+                        Task { await reloadAll() }
                     }
+                    .disabled(isLoading)
                     Button("ログアウト") {
                         Task { await handleSignOut() }
                     }
                 }
             }
             .task {
-                await loadPatients()
-                if !selectedPatientId.isEmpty {
-                    await loadMedications()
-                    await loadSchedules()
-                }
+                await reloadAll()
             }
             .onChange(of: selectedPatientId) { newValue in
                 guard !newValue.isEmpty else {
@@ -492,6 +497,16 @@ struct MedicationsView: View {
         Task { @MainActor in
             try? await Task.sleep(for: .seconds(2))
             showToast = false
+        }
+    }
+
+    private func reloadAll() async {
+        isLoading = true
+        defer { isLoading = false }
+        await loadPatients()
+        if !selectedPatientId.isEmpty {
+            await loadMedications()
+            await loadSchedules()
         }
     }
 }

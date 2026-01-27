@@ -15,6 +15,7 @@ targets:
       - MedPatient
       - Features
       - Services
+      - Assets.xcassets
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.medmanager.patient

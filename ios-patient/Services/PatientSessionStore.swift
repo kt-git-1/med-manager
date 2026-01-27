@@ -22,6 +22,30 @@ final class PatientSessionStore: ObservableObject {
         }
     }
 
+    func loadAsync() {
+        let expiryKey = expiryStorageKey
+        Task.detached { [weak self] in
+            AppLogger.auth.info("Session async load started")
+            do {
+                let keychain = KeychainStore()
+                let token = try keychain.readToken()
+                let stored = UserDefaults.standard.double(forKey: expiryKey)
+                let expiry = stored > 0 ? Date(timeIntervalSince1970: stored) : nil
+                await MainActor.run {
+                    self?.token = token
+                    self?.expiresAt = expiry
+                }
+                AppLogger.auth.info("Session async load completed")
+            } catch {
+                AppLogger.auth.error("Session async load failed: \(error.localizedDescription, privacy: .public)")
+                await MainActor.run {
+                    self?.token = nil
+                    self?.expiresAt = nil
+                }
+            }
+        }
+    }
+
     func save(token: String, expiresIn: Int) {
         AppLogger.auth.info("Session save started")
         do {

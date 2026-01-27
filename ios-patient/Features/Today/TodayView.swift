@@ -7,82 +7,110 @@ struct TodayView: View {
     @State private var errorMessage: String?
     @State private var isLoading = false
     @State private var sendingIds: Set<String> = []
-    private let offlineQueue = OfflineQueue()
+    @State private var offlineQueue: OfflineQueue?
     private let scheduler = NotificationScheduler()
+    private let overdueInterval: TimeInterval = 60 * 60
 
     var body: some View {
         NavigationStack {
-            List {
-                Section {
-                    HStack(spacing: 12) {
-                        Image(systemName: "sun.max.fill")
-                            .foregroundStyle(.white, .teal)
-                            .font(.title2)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("今日の服薬")
-                                .font(.headline)
-                            Text("予定に合わせて反応を記録します。")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(.vertical, 4)
-                }
-                if let errorMessage {
-                    Text(errorMessage)
-                        .foregroundStyle(.red)
-                }
-                Section(header: Text("今日の予定")) {
-                    if doseInstances.isEmpty {
-                        Text("予定がありません")
-                    } else {
-                        ForEach(doseInstances, id: \.id) { item in
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(item.medicationName ?? "お薬")
+            ZStack {
+                List {
+                    Section {
+                        HStack(spacing: 12) {
+                            Image(systemName: "sun.max.fill")
+                                .foregroundStyle(.white, .teal)
+                                .font(.title2)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("今日の服薬")
                                     .font(.headline)
-                                HStack(spacing: 8) {
-                                    Text(formatTime(item.scheduledFor))
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                    if let timeSlot = formatTimeSlot(item.scheduledFor),
-                                       let presetLabel = presetLabel(for: timeSlot) {
-                                        Text(presetLabel)
-                                            .font(.caption)
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 4)
-                                            .background(.teal.opacity(0.12))
-                                            .clipShape(Capsule())
-                                            .foregroundStyle(.teal)
+                                Text("予定に合わせて反応を記録します。")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
+                    if let errorMessage {
+                        Text(errorMessage)
+                            .foregroundStyle(.red)
+                    }
+                    Section(header: Text("今日の予定")) {
+                        if doseInstances.isEmpty {
+                            Text("予定がありません")
+                        } else {
+                            ForEach(sortedDoseInstances, id: \.id) { item in
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text(item.medicationName ?? "お薬")
+                                        .font(.headline)
+                                    HStack(spacing: 8) {
+                                        Text(formatTime(item.scheduledFor))
+                                            .font(.subheadline)
+                                            .foregroundStyle(.secondary)
+                                        if let timeSlot = formatTimeSlot(item.scheduledFor),
+                                           let presetLabel = presetLabel(for: timeSlot) {
+                                            Text(presetLabel)
+                                                .font(.caption)
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 4)
+                                                .background(.teal.opacity(0.12))
+                                                .clipShape(Capsule())
+                                                .foregroundStyle(.teal)
+                                        }
                                     }
-                                }
-                                if item.status == "taken" {
-                                    Label("服用済み", systemImage: "checkmark.circle.fill")
-                                        .foregroundStyle(.green)
-                                } else if item.status == "skipped" {
-                                    Label("スキップ済み", systemImage: "minus.circle.fill")
-                                        .foregroundStyle(.secondary)
-                                } else {
-                                    HStack {
-                                        Button("服用済み") {
-                                            Task { await sendAdherence(item, action: "taken") }
+                                    if item.status == "taken" {
+                                        Label("服用済み", systemImage: "checkmark.circle.fill")
+                                            .foregroundStyle(.green)
+                                    } else if item.status == "skipped" {
+                                        Label("スキップ済み", systemImage: "minus.circle.fill")
+                                            .foregroundStyle(.secondary)
+                                    } else {
+                                        if isOverdue(item) {
+                                            Label("未服用", systemImage: "exclamationmark.circle.fill")
+                                                .foregroundStyle(.orange)
                                         }
-                                        .buttonStyle(.borderedProminent)
-                                        .tint(.teal)
-                                        .disabled(sendingIds.contains(item.id) || isLoading)
-                                        Button("スキップ") {
-                                            Task { await sendAdherence(item, action: "skipped") }
-                                        }
-                                        .buttonStyle(.bordered)
-                                        .tint(.teal)
-                                        .disabled(sendingIds.contains(item.id) || isLoading)
-                                        if sendingIds.contains(item.id) {
-                                            ProgressView()
+                                        HStack {
+                                            Button("飲んだ") {
+                                                Task { await sendAdherence(item, action: "taken") }
+                                            }
+                                            .buttonStyle(.borderedProminent)
+                                            .tint(.teal)
+                                            .controlSize(.large)
+                                            .font(.title3)
+                                            .padding(.vertical, 6)
+                                            .padding(.horizontal, 8)
+                                            .disabled(sendingIds.contains(item.id) || isLoading)
+                                            Button("スキップ") {
+                                                Task { await sendAdherence(item, action: "skipped") }
+                                            }
+                                            .buttonStyle(.bordered)
+                                            .tint(.teal)
+                                            .disabled(sendingIds.contains(item.id) || isLoading)
+                                            if sendingIds.contains(item.id) {
+                                                ProgressView()
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
                     }
+                }
+                if isLoading {
+                    Color.black.opacity(0.2)
+                        .ignoresSafeArea()
+                    VStack(spacing: 12) {
+                        Image("AppLogo")
+                            .resizable()
+                            .scaledToFit()
+                            .frame(width: 64, height: 64)
+                        ProgressView()
+                        Text("更新中")
+                            .font(.headline)
+                    }
+                    .padding(20)
+                    .background(.ultraThinMaterial)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .shadow(radius: 8)
                 }
             }
             .navigationTitle("今日")
@@ -173,7 +201,11 @@ struct TodayView: View {
                 "clientUuid": UUID().uuidString,
             ]
             if let data = try? JSONSerialization.data(withJSONObject: payload, options: []) {
-                offlineQueue.enqueue(PendingAdherence(clientUuid: UUID(uuidString: payload["clientUuid"] ?? "") ?? UUID(), payload: data))
+                let queue = await offlineQueueInstance()
+                queue.enqueue(PendingAdherence(
+                    clientUuid: UUID(uuidString: payload["clientUuid"] ?? "") ?? UUID(),
+                    payload: data
+                ))
                 errorMessage = "オフラインのため送信待ちに保存しました。"
             } else {
                 errorMessage = "送信に失敗しました。"
@@ -186,7 +218,8 @@ struct TodayView: View {
 
     private func flushOfflineQueue() async {
         guard !apiBaseURL.isEmpty else { return }
-        let items = offlineQueue.all()
+        let queue = await offlineQueueInstance()
+        let items = queue.all()
         guard !items.isEmpty else { return }
         for item in items {
             guard
@@ -196,7 +229,7 @@ struct TodayView: View {
                 let takenAt = payload["takenAt"],
                 let clientUuid = payload["clientUuid"]
             else {
-                offlineQueue.remove(clientUuid: item.clientUuid)
+                queue.remove(clientUuid: item.clientUuid)
                 continue
             }
             do {
@@ -207,10 +240,21 @@ struct TodayView: View {
                     takenAt: takenAt,
                     clientUuid: clientUuid
                 )
-                offlineQueue.remove(clientUuid: item.clientUuid)
+                queue.remove(clientUuid: item.clientUuid)
             } catch {
                 continue
             }
+        }
+    }
+
+    private func offlineQueueInstance() async -> OfflineQueue {
+        await MainActor.run {
+            if let offlineQueue {
+                return offlineQueue
+            }
+            let created = OfflineQueue()
+            offlineQueue = created
+            return created
         }
     }
 
@@ -226,17 +270,43 @@ struct TodayView: View {
         ISO8601DateFormatter().string(from: Date())
     }
 
+    private var sortedDoseInstances: [DoseInstanceDTO] {
+        doseInstances.sorted { lhs, rhs in
+            let lhsDone = isCompleted(lhs)
+            let rhsDone = isCompleted(rhs)
+            if lhsDone != rhsDone {
+                return !lhsDone
+            }
+            let lhsDate = parseDate(lhs.scheduledFor) ?? .distantFuture
+            let rhsDate = parseDate(rhs.scheduledFor) ?? .distantFuture
+            return lhsDate < rhsDate
+        }
+    }
+
+    private func isCompleted(_ item: DoseInstanceDTO) -> Bool {
+        item.status == "taken" || item.status == "skipped"
+    }
+
+    private func isOverdue(_ item: DoseInstanceDTO) -> Bool {
+        guard !isCompleted(item) else { return false }
+        guard let scheduledDate = parseDate(item.scheduledFor) else { return false }
+        return scheduledDate.addingTimeInterval(overdueInterval) < Date()
+    }
+
     private func parseDate(_ value: String) -> Date? {
-        ISO8601DateFormatter().date(from: value)
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: value) {
+            return date
+        }
+        return ISO8601DateFormatter().date(from: value)
     }
 
     private func formatTime(_ value: String) -> String {
         guard let date = parseDate(value) else { return value }
         let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.locale = Locale(identifier: "ja_JP")
         formatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
-        formatter.dateFormat = "yyyy-MM-dd/HH:mm"
+        formatter.dateFormat = "HH:mm"
         return formatter.string(from: date)
     }
 
