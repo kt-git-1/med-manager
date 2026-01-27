@@ -3,6 +3,7 @@ import SwiftUI
 struct LinkingCodeView: View {
     @AppStorage("familyJwtToken") private var familyJwtToken: String = ""
     @AppStorage("familySelectedPatientId") private var storedPatientId: String = ""
+    @AppStorage("familySelectedPatientName") private var storedPatientName: String = ""
     @State private var patients: [FamilyPatientDTO] = []
     @State private var selectedPatientId: String = ""
     @State private var isLoadingPatients = false
@@ -34,7 +35,7 @@ struct LinkingCodeView: View {
                         .padding(.vertical, 4)
                     }
 
-                    Section(header: Text("患者一覧")) {
+                    Section(header: Text("患者選択")) {
                         if isLoadingPatients {
                             Text("読み込み中...")
                                 .foregroundStyle(.secondary)
@@ -135,6 +136,13 @@ struct LinkingCodeView: View {
             .task {
                 await reloadAll()
             }
+            .onChange(of: selectedPatientId) { newValue in
+                guard !newValue.isEmpty else { return }
+                storedPatientId = newValue
+                if let match = patients.first(where: { $0.id == newValue }) {
+                    storedPatientName = match.displayName
+                }
+            }
         }
     }
 
@@ -155,8 +163,10 @@ struct LinkingCodeView: View {
             patients = result
             if !storedPatientId.isEmpty, result.contains(where: { $0.id == storedPatientId }) {
                 selectedPatientId = storedPatientId
+                storedPatientName = result.first(where: { $0.id == storedPatientId })?.displayName ?? ""
             } else if selectedPatientId.isEmpty, let first = result.first?.id {
                 selectedPatientId = first
+                storedPatientName = result.first(where: { $0.id == first })?.displayName ?? ""
             }
         } catch {
             errorMessage = "患者一覧の取得に失敗しました。"
@@ -176,6 +186,7 @@ struct LinkingCodeView: View {
             patients.insert(patient, at: 0)
             selectedPatientId = patient.id
             storedPatientId = patient.id
+            storedPatientName = patient.displayName
             newPatientName = ""
             await issueCode()
         } catch {

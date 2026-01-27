@@ -3,9 +3,8 @@ import SwiftUI
 struct SchedulesView: View {
     @AppStorage("familyJwtToken") private var familyJwtToken: String = ""
     @AppStorage("familySelectedPatientId") private var storedPatientId: String = ""
-    @State private var patients: [FamilyPatientDTO] = []
+    @AppStorage("familySelectedPatientName") private var storedPatientName: String = ""
     @State private var selectedPatientId: String = ""
-    @State private var isLoadingPatients = false
     @State private var medications: [FamilyMedicationDTO] = []
     @State private var schedules: [FamilyScheduleDTO] = []
     @State private var errorMessage: String?
@@ -18,16 +17,11 @@ struct SchedulesView: View {
                     FamilyHeaderSection(
                         systemImage: "clock.fill",
                         title: "予定を管理",
-                        subtitle: "患者を選択して予定を追加します。"
+                        subtitle: "患者タブで選択中の患者の予定を確認します。"
                     )
-                    FamilyPatientSection(
-                        isLoadingPatients: isLoadingPatients,
-                        patients: patients,
-                        selectedPatientId: $selectedPatientId,
-                        familyJwtToken: familyJwtToken,
-                        errorMessage: nil,
-                        actionTitle: nil,
-                        onAction: nil
+                    FamilySelectedPatientSection(
+                        selectedPatientId: selectedPatientId,
+                        selectedPatientName: storedPatientName
                     )
                     Section(header: Text("予定一覧")) {
                         if let errorMessage {
@@ -78,16 +72,8 @@ struct SchedulesView: View {
             .task {
                 await reloadAll()
             }
-            .onChange(of: selectedPatientId) { newValue in
-                guard !newValue.isEmpty else {
-                    medications = []
-                    schedules = []
-                    return
-                }
-                Task {
-                    await loadMedications()
-                    await loadSchedules()
-                }
+            .onChange(of: storedPatientId) { _ in
+                Task { await reloadAll() }
             }
         }
     }
@@ -99,30 +85,11 @@ struct SchedulesView: View {
         selectedPatientId = ""
     }
 
-    private func loadPatients() async {
-        errorMessage = nil
-        isLoadingPatients = true
-        defer { isLoadingPatients = false }
-        do {
-            let client = try FamilyAPIClient(token: familyJwtToken)
-            let result = try await client.listPatients()
-            patients = result
-            if !storedPatientId.isEmpty, result.contains(where: { $0.id == storedPatientId }) {
-                selectedPatientId = storedPatientId
-            } else if selectedPatientId.isEmpty, let first = result.first?.id {
-                selectedPatientId = first
-            }
-        } catch {
-            errorMessage = "患者一覧の取得に失敗しました。"
-        }
-    }
-
     private func loadSchedules() async {
         errorMessage = nil
         do {
             let client = try FamilyAPIClient(token: familyJwtToken)
             schedules = try await client.listSchedules(patientId: selectedPatientId)
-            storedPatientId = selectedPatientId
         } catch {
             errorMessage = "予定一覧の取得に失敗しました。"
         }
@@ -140,11 +107,15 @@ struct SchedulesView: View {
     private func reloadAll() async {
         isLoading = true
         defer { isLoading = false }
-        await loadPatients()
-        if !selectedPatientId.isEmpty {
-            await loadMedications()
-            await loadSchedules()
+        selectedPatientId = storedPatientId
+        guard !selectedPatientId.isEmpty else {
+            medications = []
+            schedules = []
+            errorMessage = nil
+            return
         }
+        await loadMedications()
+        await loadSchedules()
     }
 
     private func medicationName(for medicationId: String) -> String? {

@@ -3,12 +3,11 @@ import SwiftUI
 struct HistoryView: View {
     @AppStorage("familyJwtToken") private var familyJwtToken: String = ""
     @AppStorage("familySelectedPatientId") private var storedPatientId: String = ""
-    @State private var patients: [FamilyPatientDTO] = []
+    @AppStorage("familySelectedPatientName") private var storedPatientName: String = ""
     @State private var selectedPatientId: String = ""
     @State private var adherenceItems: [FamilyAdherenceLogDTO] = []
     @State private var errorMessage: String?
     @State private var isLoading = false
-    @State private var isLoadingPatients = false
     @State private var selectedMode: HistoryMode = .list
     @State private var calendarMonth = Date()
     @State private var selectedDate = Date()
@@ -22,17 +21,16 @@ struct HistoryView: View {
                         title: "服薬履歴",
                         subtitle: "患者の履歴を一覧/カレンダーで確認できます。"
                     )
-                    FamilyPatientSection(
-                        isLoadingPatients: isLoadingPatients,
-                        patients: patients,
-                        selectedPatientId: $selectedPatientId,
-                        familyJwtToken: familyJwtToken,
-                        errorMessage: errorMessage,
-                        actionTitle: "履歴を読み込む",
-                        onAction: {
-                            Task { await loadHistory() }
-                        }
+                    FamilySelectedPatientSection(
+                        selectedPatientId: selectedPatientId,
+                        selectedPatientName: storedPatientName
                     )
+                    if let errorMessage {
+                        Section {
+                            Text(errorMessage)
+                                .foregroundStyle(.red)
+                        }
+                    }
                     modeSection
                     if selectedMode == .list {
                         historyListSection
@@ -59,8 +57,8 @@ struct HistoryView: View {
             .task {
                 await reloadAll()
             }
-            .onChange(of: selectedPatientId) { _ in
-                Task { await loadHistory() }
+            .onChange(of: storedPatientId) { _ in
+                Task { await reloadAll() }
             }
         }
     }
@@ -178,31 +176,13 @@ struct HistoryView: View {
     private func reloadAll() async {
         isLoading = true
         defer { isLoading = false }
-        await loadPatients()
-        await loadHistory()
-    }
-
-    private func loadPatients() async {
-        errorMessage = nil
-        isLoadingPatients = true
-        defer { isLoadingPatients = false }
-        guard !familyJwtToken.isEmpty else {
-            patients = []
-            selectedPatientId = ""
+        selectedPatientId = storedPatientId
+        guard !selectedPatientId.isEmpty else {
+            adherenceItems = []
+            errorMessage = nil
             return
         }
-        do {
-            let client = try FamilyAPIClient(token: familyJwtToken)
-            let result = try await client.listPatients()
-            patients = result
-            if !storedPatientId.isEmpty, result.contains(where: { $0.id == storedPatientId }) {
-                selectedPatientId = storedPatientId
-            } else if selectedPatientId.isEmpty, let first = result.first?.id {
-                selectedPatientId = first
-            }
-        } catch {
-            errorMessage = "患者一覧の取得に失敗しました。"
-        }
+        await loadHistory()
     }
 
     private func loadHistory() async {
@@ -227,7 +207,6 @@ struct HistoryView: View {
                 selectedDate = latestDate
                 calendarMonth = calendar.startOfDay(for: latestDate)
             }
-            storedPatientId = selectedPatientId
         } catch {
             errorMessage = "履歴取得に失敗しました。"
         }

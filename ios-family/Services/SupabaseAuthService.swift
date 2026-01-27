@@ -90,7 +90,17 @@ enum SupabaseAuthService {
         authStateTask?.cancel()
         authStateTask = Task {
             for await (event, session) in await client.auth.authStateChanges {
+                if event == .signedOut {
+                    clearStoredSessionTokens()
+                    AppLogger.auth.info("Supabase auth event: signedOut")
+                    continue
+                }
                 guard let session else { continue }
+                if event == .initialSession, session.isExpired {
+                    clearStoredSessionTokens()
+                    AppLogger.auth.info("Supabase auth event: initialSession expired")
+                    continue
+                }
                 storeSession(session)
                 AppLogger.auth.info("Supabase auth event: \(String(describing: event))")
             }
@@ -131,6 +141,9 @@ enum SupabaseAuthService {
             throw SupabaseAuthError.missingConfig
         }
 
-        return SupabaseClient(supabaseURL: url, supabaseKey: key)
+        let options = SupabaseClientOptions(
+            auth: .init(emitLocalSessionAsInitialSession: true)
+        )
+        return SupabaseClient(supabaseURL: url, supabaseKey: key, options: options)
     }
 }

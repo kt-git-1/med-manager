@@ -3,9 +3,8 @@ import SwiftUI
 struct MedicationsView: View {
     @AppStorage("familyJwtToken") private var familyJwtToken: String = ""
     @AppStorage("familySelectedPatientId") private var storedPatientId: String = ""
-    @State private var patients: [FamilyPatientDTO] = []
+    @AppStorage("familySelectedPatientName") private var storedPatientName: String = ""
     @State private var selectedPatientId: String = ""
-    @State private var isLoadingPatients = false
     @State private var medications: [FamilyMedicationDTO] = []
     @State private var schedules: [FamilyScheduleDTO] = []
     @State private var name: String = ""
@@ -28,7 +27,10 @@ struct MedicationsView: View {
             ZStack {
                 Form {
                     headerSection
-                    patientSection
+                    FamilySelectedPatientSection(
+                        selectedPatientId: selectedPatientId,
+                        selectedPatientName: storedPatientName
+                    )
                     listSection
                     addSection
                 }
@@ -85,16 +87,8 @@ struct MedicationsView: View {
             .task {
                 await reloadAll()
             }
-            .onChange(of: selectedPatientId) { newValue in
-                guard !newValue.isEmpty else {
-                    medications = []
-                    schedules = []
-                    return
-                }
-                Task {
-                    await loadMedications()
-                    await loadSchedules()
-                }
+            .onChange(of: storedPatientId) { _ in
+                Task { await reloadAll() }
             }
         }
     }
@@ -108,39 +102,12 @@ struct MedicationsView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("薬を管理")
                         .font(.headline)
-                    Text("患者を選択して薬の一覧と追加ができます。")
+                    Text("患者タブで選択中の患者の薬を管理します。")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
             }
             .padding(.vertical, 4)
-        }
-    }
-
-    private var patientSection: some View {
-        Section(header: Text("対象患者")) {
-            if isLoadingPatients {
-                Text("読み込み中...")
-                    .foregroundStyle(.secondary)
-            } else if patients.isEmpty {
-                Text("患者が見つかりません。連携タブで患者を追加してください。")
-                    .foregroundStyle(.secondary)
-            } else {
-                Picker("患者", selection: $selectedPatientId) {
-                    ForEach(patients, id: \.id) { patient in
-                        Text(patient.displayName).tag(patient.id)
-                    }
-                }
-            }
-            Button("薬一覧を読み込む") {
-                Task {
-                    await loadMedications()
-                    await loadSchedules()
-                }
-            }
-            .buttonStyle(.bordered)
-            .tint(.teal)
-            .disabled(selectedPatientId.isEmpty || familyJwtToken.isEmpty)
         }
     }
 
@@ -283,30 +250,11 @@ struct MedicationsView: View {
         selectedPatientId = ""
     }
 
-    private func loadPatients() async {
-        errorMessage = nil
-        isLoadingPatients = true
-        defer { isLoadingPatients = false }
-        do {
-            let client = try FamilyAPIClient(token: familyJwtToken)
-            let result = try await client.listPatients()
-            patients = result
-            if !storedPatientId.isEmpty, result.contains(where: { $0.id == storedPatientId }) {
-                selectedPatientId = storedPatientId
-            } else if selectedPatientId.isEmpty, let first = result.first?.id {
-                selectedPatientId = first
-            }
-        } catch {
-            errorMessage = "患者一覧の取得に失敗しました。"
-        }
-    }
-
     private func loadMedications() async {
         errorMessage = nil
         do {
             let client = try FamilyAPIClient(token: familyJwtToken)
             medications = try await client.listMedications(patientId: selectedPatientId)
-            storedPatientId = selectedPatientId
         } catch {
             errorMessage = "薬一覧の取得に失敗しました。"
         }
@@ -321,7 +269,6 @@ struct MedicationsView: View {
         do {
             let client = try FamilyAPIClient(token: familyJwtToken)
             schedules = try await client.listSchedules(patientId: selectedPatientId)
-            storedPatientId = selectedPatientId
         } catch {
             errorMessage = "予定一覧の取得に失敗しました。"
         }
@@ -503,11 +450,15 @@ struct MedicationsView: View {
     private func reloadAll() async {
         isLoading = true
         defer { isLoading = false }
-        await loadPatients()
-        if !selectedPatientId.isEmpty {
-            await loadMedications()
-            await loadSchedules()
+        selectedPatientId = storedPatientId
+        guard !selectedPatientId.isEmpty else {
+            medications = []
+            schedules = []
+            errorMessage = nil
+            return
         }
+        await loadMedications()
+        await loadSchedules()
     }
 }
 

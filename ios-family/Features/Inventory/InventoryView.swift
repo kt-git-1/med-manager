@@ -3,20 +3,22 @@ import SwiftUI
 struct InventoryView: View {
     @AppStorage("familyJwtToken") private var familyJwtToken: String = ""
     @AppStorage("familySelectedPatientId") private var storedPatientId: String = ""
-    @State private var patients: [FamilyPatientDTO] = []
+    @AppStorage("familySelectedPatientName") private var storedPatientName: String = ""
     @State private var medications: [FamilyMedicationDTO] = []
     @State private var inventoryItems: [InventoryDTO] = []
     @State private var selectedPatientId: String = ""
     @State private var errorMessage: String?
     @State private var isLoading = false
-    @State private var isLoadingPatients = false
 
     var body: some View {
         NavigationStack {
             ZStack {
                 List {
                     headerSection
-                    patientSection
+                    FamilySelectedPatientSection(
+                        selectedPatientId: selectedPatientId,
+                        selectedPatientName: storedPatientName
+                    )
                     inventorySection
                 }
                 if isLoading {
@@ -54,8 +56,8 @@ struct InventoryView: View {
             .task {
                 await reloadAll()
             }
-            .onChange(of: selectedPatientId) { _ in
-                Task { await loadInventory() }
+            .onChange(of: storedPatientId) { _ in
+                Task { await reloadAll() }
             }
         }
     }
@@ -78,36 +80,12 @@ struct InventoryView: View {
         }
     }
 
-    private var patientSection: some View {
-        Section(header: Text("対象患者")) {
-            if isLoadingPatients {
-                Text("読み込み中...")
-                    .foregroundStyle(.secondary)
-            } else if patients.isEmpty {
-                Text("患者が見つかりません。連携タブで患者を追加してください。")
-                    .foregroundStyle(.secondary)
-            } else {
-                Picker("患者", selection: $selectedPatientId) {
-                    ForEach(patients, id: \.id) { patient in
-                        Text(patient.displayName).tag(patient.id)
-                    }
-                }
-            }
-            Button("在庫を読み込む") {
-                Task { await loadInventory() }
-            }
-            .buttonStyle(.bordered)
-            .tint(.teal)
-            .disabled(selectedPatientId.isEmpty || familyJwtToken.isEmpty)
+    private var inventorySection: some View {
+        Section(header: Text("在庫一覧")) {
             if let errorMessage {
                 Text(errorMessage)
                     .foregroundStyle(.red)
             }
-        }
-    }
-
-    private var inventorySection: some View {
-        Section(header: Text("在庫一覧")) {
             if inventoryItems.isEmpty {
                 Text("在庫がありません。")
                     .foregroundStyle(.secondary)
@@ -173,24 +151,6 @@ struct InventoryView: View {
         selectedPatientId = ""
     }
 
-    private func loadPatients() async {
-        errorMessage = nil
-        isLoadingPatients = true
-        defer { isLoadingPatients = false }
-        do {
-            let client = try FamilyAPIClient(token: familyJwtToken)
-            let result = try await client.listPatients()
-            patients = result
-            if !storedPatientId.isEmpty, result.contains(where: { $0.id == storedPatientId }) {
-                selectedPatientId = storedPatientId
-            } else if selectedPatientId.isEmpty, let first = result.first?.id {
-                selectedPatientId = first
-            }
-        } catch {
-            errorMessage = "患者一覧の取得に失敗しました。"
-        }
-    }
-
     private func loadInventory() async {
         guard !selectedPatientId.isEmpty else {
             inventoryItems = []
@@ -203,7 +163,6 @@ struct InventoryView: View {
             let client = try FamilyAPIClient(token: familyJwtToken)
             medications = try await client.listMedications(patientId: selectedPatientId)
             inventoryItems = try await client.listInventory(patientId: selectedPatientId)
-            storedPatientId = selectedPatientId
         } catch {
             errorMessage = "在庫の取得に失敗しました。"
         }
@@ -212,10 +171,13 @@ struct InventoryView: View {
     private func reloadAll() async {
         isLoading = true
         defer { isLoading = false }
-        await loadPatients()
-        if !selectedPatientId.isEmpty {
-            await loadInventory()
+        selectedPatientId = storedPatientId
+        guard !selectedPatientId.isEmpty else {
+            inventoryItems = []
+            errorMessage = nil
+            return
         }
+        await loadInventory()
     }
 
     private func formatDateTime(_ value: String) -> String {

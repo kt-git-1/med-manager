@@ -64,6 +64,31 @@ struct FamilyPatientSection: View {
     }
 }
 
+struct FamilySelectedPatientSection: View {
+    let selectedPatientId: String
+    let selectedPatientName: String
+
+    var body: some View {
+        Section(header: Text("対象患者")) {
+            if selectedPatientId.isEmpty {
+                Text("患者タブで対象患者を選択してください。")
+                    .foregroundStyle(.secondary)
+            } else if selectedPatientName.isEmpty {
+                Text("患者タブで選択中の患者のデータを表示します。")
+                    .foregroundStyle(.secondary)
+            } else {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("選択中: \(selectedPatientName)")
+                        .font(.headline)
+                    Text("患者タブで選択中の患者のデータを表示します。")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+    }
+}
+
 struct FamilyLoadingOverlay: View {
     let isLoading: Bool
     let message: String

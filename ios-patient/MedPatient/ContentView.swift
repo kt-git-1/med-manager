@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct ContentView: View {
     @StateObject private var sessionStore = PatientSessionStore()
@@ -26,6 +29,7 @@ struct ContentView: View {
                 .tint(.teal)
             }
         }
+        .dismissKeyboardOnTap()
         .onAppear {
             guard !hasBootstrapped else { return }
             hasBootstrapped = true
@@ -35,6 +39,29 @@ struct ContentView: View {
                 sessionStore.startAutoRefresh(apiBaseURL: apiBaseURL)
             }
         }
+    }
+}
+
+extension View {
+    func dismissKeyboardOnTap() -> some View {
+        modifier(DismissKeyboardOnTapModifier())
+    }
+}
+
+private struct DismissKeyboardOnTapModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content.simultaneousGesture(
+            TapGesture().onEnded {
+                #if canImport(UIKit)
+                UIApplication.shared.sendAction(
+                    #selector(UIResponder.resignFirstResponder),
+                    to: nil,
+                    from: nil,
+                    for: nil
+                )
+                #endif
+            }
+        )
     }
 }
 
