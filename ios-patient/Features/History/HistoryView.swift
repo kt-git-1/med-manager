@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct HistoryView: View {
+    @ObservedObject var sessionStore: PatientSessionStore
+
     var body: some View {
         NavigationStack {
             List {
@@ -27,10 +29,15 @@ struct HistoryView: View {
             .navigationTitle("履歴")
             .tint(.teal)
             .listStyle(.insetGrouped)
+            .toolbar {
+                Button("ログアウト") {
+                    sessionStore.clear()
+                }
+            }
         }
     }
 }
 
 #Preview {
-    HistoryView()
+    HistoryView(sessionStore: PatientSessionStore())
 }

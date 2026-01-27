@@ -55,6 +55,14 @@ final class APIClient {
         return try await decode(PatientSessionDTO.self, request: request)
     }
 
+    func refreshPatientSession() async throws -> PatientSessionDTO {
+        let endpoint = baseURL.appendingPathComponent("/me/session/refresh")
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "POST"
+        try attachPatientAuth(to: &request)
+        return try await decode(PatientSessionDTO.self, request: request)
+    }
+
     func getTodayDoseInstances(date: String) async throws -> [DoseInstanceDTO] {
         let endpoint = baseURL.appendingPathComponent("/me/dose-instances")
         var components = URLComponents(url: endpoint, resolvingAgainstBaseURL: false)

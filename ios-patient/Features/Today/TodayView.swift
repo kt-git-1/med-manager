@@ -79,6 +79,7 @@ struct TodayView: View {
             errorMessage = "API_BASE_URLが未設定です。"
             return
         }
+        await sessionStore.refreshIfNeeded(apiBaseURL: apiBaseURL)
         isLoading = true
         defer { isLoading = false }
         errorMessage = nil
@@ -101,6 +102,7 @@ struct TodayView: View {
     }
 
     private func sendAdherence(_ item: DoseInstanceDTO, action: String) async {
+        await sessionStore.refreshIfNeeded(apiBaseURL: apiBaseURL)
         do {
             let client = try APIClient(baseURLString: apiBaseURL, keychain: KeychainStore())
             let payload = [

@@ -130,14 +130,26 @@ struct LinkingCodeView: View {
             }
             .animation(.easeInOut(duration: 0.2), value: showCopyToast)
             .toolbar {
-                Button("更新") {
-                    Task { await loadPatients() }
+                ToolbarItemGroup(placement: .navigationBarTrailing) {
+                    Button("更新") {
+                        Task { await loadPatients() }
+                    }
+                    Button("ログアウト") {
+                        Task { await handleSignOut() }
+                    }
                 }
             }
             .task {
                 await loadPatients()
             }
         }
+    }
+
+    private func handleSignOut() async {
+        await SupabaseAuthService.signOut()
+        familyJwtToken = ""
+        storedPatientId = ""
+        selectedPatientId = ""
     }
 
     private func loadPatients() async {

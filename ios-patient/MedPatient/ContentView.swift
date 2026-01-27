@@ -17,7 +17,7 @@ struct ContentView: View {
                         .tabItem {
                             Label("今日", systemImage: "checkmark.circle")
                         }
-                    HistoryView()
+                    HistoryView(sessionStore: sessionStore)
                         .tabItem {
                             Label("履歴", systemImage: "calendar")
                         }
@@ -25,8 +25,12 @@ struct ContentView: View {
                 .tint(.teal)
             }
         }
-        .task {
+        .onAppear {
             sessionStore.load()
+            Task {
+                await sessionStore.refreshIfNeeded(apiBaseURL: apiBaseURL)
+                sessionStore.startAutoRefresh(apiBaseURL: apiBaseURL)
+            }
         }
     }
 }

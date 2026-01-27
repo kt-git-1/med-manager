@@ -53,7 +53,8 @@ struct LinkingView: View {
         do {
             let client = try APIClient(baseURLString: apiBaseURL, keychain: KeychainStore())
             let session = try await client.verifyLinkCode(code)
-            sessionStore.save(token: session.accessToken)
+            sessionStore.save(token: session.accessToken, expiresIn: session.expiresIn)
+            sessionStore.startAutoRefresh(apiBaseURL: apiBaseURL)
         } catch {
             errorMessage = "連携に失敗しました。コードを確認してください。"
         }
