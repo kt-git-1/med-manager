@@ -7,12 +7,6 @@ struct SchedulesView: View {
     @State private var selectedPatientId: String = ""
     @State private var isLoadingPatients = false
     @State private var schedules: [FamilyScheduleDTO] = []
-    @State private var medicationId: String = ""
-    @State private var timesPerDay: String = "1"
-    @State private var timeSlots: String = ""
-    @State private var selectedWeekdays = Set([0, 1, 2, 3, 4, 5, 6])
-    @State private var startDate: String = ""
-    @State private var endDate: String = ""
     @State private var errorMessage: String?
 
     var body: some View {
@@ -48,12 +42,6 @@ struct SchedulesView: View {
                             }
                         }
                     }
-                    Button("予定一覧を読み込む") {
-                        Task { await loadSchedules() }
-                    }
-                    .buttonStyle(.bordered)
-                    .tint(.teal)
-                    .disabled(selectedPatientId.isEmpty || familyJwtToken.isEmpty)
                 }
                 Section(header: Text("予定一覧")) {
                     if let errorMessage {
@@ -75,43 +63,6 @@ struct SchedulesView: View {
                         }
                     }
                 }
-                Section(header: Text("予定追加")) {
-                    TextField("medicationId", text: $medicationId)
-                        .textInputAutocapitalization(.never)
-                    TextField("回数/日", text: $timesPerDay)
-                        .keyboardType(.numberPad)
-                    TextField("時間 (例: 08:00,20:00)", text: $timeSlots)
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("接種曜日")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        HStack(spacing: 8) {
-                            ForEach(weekdayLabels.indices, id: \.self) { index in
-                                let isSelected = selectedWeekdays.contains(index)
-                                Button(weekdayLabels[index]) {
-                                    toggleWeekday(index)
-                                }
-                                .buttonStyle(.bordered)
-                                .tint(isSelected ? .teal : .gray)
-                            }
-                        }
-                    }
-                    TextField("開始日 YYYY-MM-DD", text: $startDate)
-                    TextField("終了日 YYYY-MM-DD (任意)", text: $endDate)
-                    Button("追加する") {
-                        Task { await createSchedule() }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.teal)
-                    .disabled(
-                        selectedPatientId.isEmpty ||
-                        medicationId.isEmpty ||
-                        timeSlots.isEmpty ||
-                        selectedWeekdays.isEmpty ||
-                        startDate.isEmpty ||
-                        familyJwtToken.isEmpty
-                    )
-                }
             }
             .navigationTitle("予定")
             .tint(.teal)
@@ -119,7 +70,12 @@ struct SchedulesView: View {
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Button("更新") {
-                        Task { await loadPatients() }
+                        Task {
+                            await loadPatients()
+                            if !selectedPatientId.isEmpty {
+                                await loadSchedules()
+                            }
+                        }
                     }
                     Button("ログアウト") {
                         Task { await handleSignOut() }
@@ -128,6 +84,16 @@ struct SchedulesView: View {
             }
             .task {
                 await loadPatients()
+                if !selectedPatientId.isEmpty {
+                    await loadSchedules()
+                }
+            }
+            .onChange(of: selectedPatientId) { newValue in
+                guard !newValue.isEmpty else {
+                    schedules = []
+                    return
+                }
+                Task { await loadSchedules() }
             }
         }
     }
@@ -168,47 +134,6 @@ struct SchedulesView: View {
         }
     }
 
-    private func createSchedule() async {
-        errorMessage = nil
-        let slots = timeSlots
-            .split(separator: ",")
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-        let count = Int(timesPerDay) ?? slots.count
-        guard slots.count == count else {
-            errorMessage = "時間の数が回数/日と一致していません。"
-            return
-        }
-        let days = selectedWeekdays.sorted()
-        do {
-            let client = try FamilyAPIClient(token: familyJwtToken)
-            let schedule = try await client.createSchedule(
-                patientId: selectedPatientId,
-                medicationId: medicationId,
-                daysOfWeek: days,
-                timesPerDay: count,
-                timeSlots: slots,
-                startDate: startDate,
-                endDate: endDate.isEmpty ? nil : endDate
-            )
-            schedules.insert(schedule, at: 0)
-            storedPatientId = selectedPatientId
-            medicationId = ""
-            timeSlots = ""
-        } catch {
-            errorMessage = "予定の追加に失敗しました。"
-        }
-    }
-
-    private let weekdayLabels = ["日", "月", "火", "水", "木", "金", "土"]
-
-    private func toggleWeekday(_ index: Int) {
-        if selectedWeekdays.contains(index) {
-            selectedWeekdays.remove(index)
-        } else {
-            selectedWeekdays.insert(index)
-        }
-    }
 }
 
 #Preview {

@@ -101,6 +101,15 @@ export const scheduleCreateSchema = z.object({
   isActive: z.boolean().optional(),
 });
 
+export const schedulePatchSchema = z.object({
+  daysOfWeek: z.array(z.number().int().min(0).max(6)).min(1).max(7).optional(),
+  timesPerDay: z.number().int().min(1).optional(),
+  timeSlots: z.array(timeOfDay).optional(),
+  startDate: isoDate.optional(),
+  endDate: isoDate.nullable().optional(),
+  isActive: z.boolean().optional(),
+});
+
 export const doseInstanceSchema = z.object({
   id: z.string(),
   medicationId: z.string(),

@@ -7,6 +7,7 @@ struct MedicationsView: View {
     @State private var selectedPatientId: String = ""
     @State private var isLoadingPatients = false
     @State private var medications: [FamilyMedicationDTO] = []
+    @State private var schedules: [FamilyScheduleDTO] = []
     @State private var name: String = ""
     @State private var dosage: String = ""
     @State private var doseCountPerIntake: String = ""
@@ -18,6 +19,9 @@ struct MedicationsView: View {
     @State private var timesPerDay: String = ""
     @State private var selectedWeekdays = Set([0, 1, 2, 3, 4, 5, 6])
     @State private var errorMessage: String?
+    @State private var showToast = false
+    @State private var toastMessage = ""
+    @State private var editingItem: MedicationEditItem?
 
     var body: some View {
         NavigationStack {
@@ -53,7 +57,10 @@ struct MedicationsView: View {
                         }
                     }
                     Button("薬一覧を読み込む") {
-                        Task { await loadMedications() }
+                        Task {
+                            await loadMedications()
+                            await loadSchedules()
+                        }
                     }
                     .buttonStyle(.bordered)
                     .tint(.teal)
@@ -68,12 +75,25 @@ struct MedicationsView: View {
                             .foregroundStyle(.secondary)
                     } else {
                         ForEach(medications, id: \.id) { med in
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("\(med.name) \(med.dosage)")
-                                    .font(.headline)
-                                Text("開始日: \(med.startDate)")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
+                            HStack(alignment: .top, spacing: 12) {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("\(med.name) \(med.dosage)")
+                                        .font(.headline)
+                                    if let summary = scheduleSummary(for: med.id) {
+                                        Text(summary)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Text("開始日: \(med.startDate)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Button("編集") {
+                                    openEditor(for: med)
+                                }
+                                .buttonStyle(.bordered)
+                                .tint(.teal)
                             }
                             .padding(.vertical, 4)
                         }
@@ -171,10 +191,37 @@ struct MedicationsView: View {
             .navigationTitle("薬")
             .tint(.teal)
             .listStyle(.insetGrouped)
+            .overlay(alignment: .bottom) {
+                if showToast {
+                    Text(toastMessage)
+                        .font(.subheadline)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(.ultraThinMaterial, in: Capsule())
+                        .padding(.bottom, 24)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+            }
+            .animation(.easeInOut(duration: 0.2), value: showToast)
+            .sheet(item: $editingItem) { item in
+                MedicationEditSheet(
+                    medication: item.medication,
+                    schedule: item.schedule,
+                    onSave: { result in
+                        await saveMedicationEdit(result)
+                    }
+                )
+            }
             .toolbar {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Button("更新") {
-                        Task { await loadPatients() }
+                        Task {
+                            await loadPatients()
+                            if !selectedPatientId.isEmpty {
+                                await loadMedications()
+                                await loadSchedules()
+                            }
+                        }
                     }
                     Button("ログアウト") {
                         Task { await handleSignOut() }
@@ -183,6 +230,21 @@ struct MedicationsView: View {
             }
             .task {
                 await loadPatients()
+                if !selectedPatientId.isEmpty {
+                    await loadMedications()
+                    await loadSchedules()
+                }
+            }
+            .onChange(of: selectedPatientId) { newValue in
+                guard !newValue.isEmpty else {
+                    medications = []
+                    schedules = []
+                    return
+                }
+                Task {
+                    await loadMedications()
+                    await loadSchedules()
+                }
             }
         }
     }
@@ -223,6 +285,21 @@ struct MedicationsView: View {
         }
     }
 
+    private func loadSchedules() async {
+        guard !selectedPatientId.isEmpty else {
+            schedules = []
+            return
+        }
+        errorMessage = nil
+        do {
+            let client = try FamilyAPIClient(token: familyJwtToken)
+            schedules = try await client.listSchedules(patientId: selectedPatientId)
+            storedPatientId = selectedPatientId
+        } catch {
+            errorMessage = "予定一覧の取得に失敗しました。"
+        }
+    }
+
     private func createMedication() async {
         errorMessage = nil
         let slots = timeSlots
@@ -247,7 +324,7 @@ struct MedicationsView: View {
                 endDate: endDate.isEmpty ? nil : endDate,
                 notes: notes.isEmpty ? nil : notes
             )
-            _ = try await client.createSchedule(
+            let schedule = try await client.createSchedule(
                 patientId: selectedPatientId,
                 medicationId: med.id,
                 daysOfWeek: days,
@@ -264,6 +341,7 @@ struct MedicationsView: View {
                 )
             }
             medications.insert(med, at: 0)
+            schedules.insert(schedule, at: 0)
             storedPatientId = selectedPatientId
             name = ""
             dosage = ""
@@ -271,8 +349,61 @@ struct MedicationsView: View {
             timeSlots = ""
             timesPerDay = ""
             inventoryCount = ""
+            showToast(message: "薬を追加しました。")
         } catch {
             errorMessage = "薬の追加または予定/在庫設定に失敗しました。"
+            showToast(message: "薬の追加に失敗しました。")
+        }
+    }
+
+    @MainActor
+    private func saveMedicationEdit(_ result: MedicationEditResult) async {
+        errorMessage = nil
+        do {
+            let client = try FamilyAPIClient(token: familyJwtToken)
+            let updatedMedication = try await client.updateMedication(
+                medicationId: result.medicationId,
+                name: result.name,
+                dosage: result.dosage,
+                doseCountPerIntake: result.doseCountPerIntake,
+                startDate: result.startDate,
+                endDate: result.endDate,
+                notes: result.notes
+            )
+            let updatedSchedule: FamilyScheduleDTO
+            if let scheduleId = result.scheduleId {
+                updatedSchedule = try await client.updateSchedule(
+                    scheduleId: scheduleId,
+                    daysOfWeek: result.daysOfWeek,
+                    timesPerDay: result.timesPerDay,
+                    timeSlots: result.timeSlots,
+                    startDate: result.scheduleStartDate,
+                    endDate: result.scheduleEndDate
+                )
+            } else {
+                updatedSchedule = try await client.createSchedule(
+                    patientId: selectedPatientId,
+                    medicationId: result.medicationId,
+                    daysOfWeek: result.daysOfWeek,
+                    timesPerDay: result.timesPerDay,
+                    timeSlots: result.timeSlots,
+                    startDate: result.scheduleStartDate,
+                    endDate: result.scheduleEndDate
+                )
+            }
+            if let index = medications.firstIndex(where: { $0.id == updatedMedication.id }) {
+                medications[index] = updatedMedication
+            }
+            if let index = schedules.firstIndex(where: { $0.id == updatedSchedule.id }) {
+                schedules[index] = updatedSchedule
+            } else {
+                schedules.insert(updatedSchedule, at: 0)
+            }
+            editingItem = nil
+            showToast(message: "薬の内容を更新しました。")
+        } catch {
+            errorMessage = "薬の更新に失敗しました。"
+            showToast(message: "薬の更新に失敗しました。")
         }
     }
 
@@ -292,6 +423,268 @@ struct MedicationsView: View {
         } else {
             selectedWeekdays.insert(index)
         }
+    }
+
+    private func scheduleSummary(for medicationId: String) -> String? {
+        guard let schedule = schedules.first(where: { $0.medicationId == medicationId }) else {
+            return "予定: 未設定"
+        }
+        let days = (schedule.daysOfWeek ?? weekdayLabels.indices.map { $0 }).sorted()
+        let labels = days.compactMap { weekdayLabels.indices.contains($0) ? weekdayLabels[$0] : nil }
+        let dayText = labels.count == 7 ? "毎日" : labels.joined(separator: "・")
+        let timeText = schedule.timeSlots.joined(separator: " / ")
+        if timeText.isEmpty {
+            return "予定: 未設定"
+        }
+        return "予定: \(timeText) (\(dayText))"
+    }
+
+    private func openEditor(for medication: FamilyMedicationDTO) {
+        let schedule = schedules.first(where: { $0.medicationId == medication.id })
+        editingItem = MedicationEditItem(medication: medication, schedule: schedule)
+    }
+
+    private func showToast(message: String) {
+        toastMessage = message
+        showToast = true
+        Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2))
+            showToast = false
+        }
+    }
+}
+
+private struct MedicationEditItem: Identifiable {
+    let medication: FamilyMedicationDTO
+    let schedule: FamilyScheduleDTO?
+
+    var id: String { medication.id }
+}
+
+private struct MedicationEditResult {
+    let medicationId: String
+    let name: String
+    let dosage: String
+    let doseCountPerIntake: Int
+    let startDate: String
+    let endDate: String?
+    let notes: String?
+    let scheduleId: String?
+    let daysOfWeek: [Int]
+    let timesPerDay: Int
+    let timeSlots: [String]
+    let scheduleStartDate: String
+    let scheduleEndDate: String?
+}
+
+private struct MedicationEditSheet: View {
+    let medication: FamilyMedicationDTO
+    let schedule: FamilyScheduleDTO?
+    let onSave: (MedicationEditResult) async -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var name: String
+    @State private var dosage: String
+    @State private var doseCountPerIntake: String
+    @State private var startDate: String
+    @State private var endDate: String
+    @State private var notes: String
+    @State private var scheduleTimeSlots: String
+    @State private var scheduleTimesPerDay: String
+    @State private var scheduleWeekdays: Set<Int>
+    @State private var scheduleStartDate: String
+    @State private var scheduleEndDate: String
+    @State private var errorMessage: String?
+    @State private var isSaving = false
+
+    init(
+        medication: FamilyMedicationDTO,
+        schedule: FamilyScheduleDTO?,
+        onSave: @escaping (MedicationEditResult) async -> Void
+    ) {
+        self.medication = medication
+        self.schedule = schedule
+        self.onSave = onSave
+        _name = State(initialValue: medication.name)
+        _dosage = State(initialValue: medication.dosage)
+        _doseCountPerIntake = State(initialValue: String(medication.doseCountPerIntake))
+        _startDate = State(initialValue: medication.startDate)
+        _endDate = State(initialValue: medication.endDate ?? "")
+        _notes = State(initialValue: medication.notes ?? "")
+        _scheduleTimeSlots = State(initialValue: schedule?.timeSlots.joined(separator: ",") ?? "")
+        _scheduleTimesPerDay = State(initialValue: String(schedule?.timesPerDay ?? 1))
+        _scheduleWeekdays = State(initialValue: Set(schedule?.daysOfWeek ?? [0, 1, 2, 3, 4, 5, 6]))
+        _scheduleStartDate = State(initialValue: schedule?.startDate ?? medication.startDate)
+        _scheduleEndDate = State(initialValue: schedule?.endDate ?? "")
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section(header: Text("薬情報")) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("名前")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        TextField("例: 血圧の薬", text: $name)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("用量")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        TextField("例: 5mg", text: $dosage)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("服用数/回")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        TextField("例: 1", text: $doseCountPerIntake)
+                            .keyboardType(.numberPad)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("開始日")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        TextField("YYYY-MM-DD", text: $startDate)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("終了日 (任意)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        TextField("YYYY-MM-DD", text: $endDate)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("メモ (任意)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        TextField("例: 食後に服用", text: $notes)
+                    }
+                }
+
+                Section(header: Text("予定")) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("接種曜日")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        HStack(spacing: 8) {
+                            ForEach(weekdayLabels.indices, id: \.self) { index in
+                                let isSelected = scheduleWeekdays.contains(index)
+                                Button(weekdayLabels[index]) {
+                                    toggleWeekday(index)
+                                }
+                                .buttonStyle(.bordered)
+                                .tint(isSelected ? .teal : .gray)
+                            }
+                        }
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("時間 (例: 08:00,20:00)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        TextField("HH:MM をカンマ区切り", text: $scheduleTimeSlots)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("回数/日")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        TextField("例: 2", text: $scheduleTimesPerDay)
+                            .keyboardType(.numberPad)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("開始日")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        TextField("YYYY-MM-DD", text: $scheduleStartDate)
+                    }
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("終了日 (任意)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        TextField("YYYY-MM-DD", text: $scheduleEndDate)
+                    }
+                }
+
+                if let errorMessage {
+                    Section {
+                        Text(errorMessage)
+                            .foregroundStyle(.red)
+                    }
+                }
+            }
+            .navigationTitle("薬を編集")
+            .tint(.teal)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("閉じる") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button(isSaving ? "保存中..." : "保存") {
+                        Task { await handleSave() }
+                    }
+                    .disabled(isSaving)
+                }
+            }
+        }
+    }
+
+    private let weekdayLabels = ["日", "月", "火", "水", "木", "金", "土"]
+
+    private func toggleWeekday(_ index: Int) {
+        if scheduleWeekdays.contains(index) {
+            scheduleWeekdays.remove(index)
+        } else {
+            scheduleWeekdays.insert(index)
+        }
+    }
+
+    private func handleSave() async {
+        errorMessage = nil
+        let slots = scheduleTimeSlots
+            .split(separator: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+        let timesPerDay = Int(scheduleTimesPerDay) ?? slots.count
+        guard !name.isEmpty, !dosage.isEmpty, !startDate.isEmpty else {
+            errorMessage = "薬情報が未入力です。"
+            return
+        }
+        guard let intakeCount = Int(doseCountPerIntake), intakeCount > 0 else {
+            errorMessage = "服用数/回を入力してください。"
+            return
+        }
+        guard !slots.isEmpty, timesPerDay > 0, slots.count == timesPerDay else {
+            errorMessage = "時間の数が回数/日と一致していません。"
+            return
+        }
+        guard !scheduleWeekdays.isEmpty else {
+            errorMessage = "接種曜日を選択してください。"
+            return
+        }
+        guard !scheduleStartDate.isEmpty else {
+            errorMessage = "予定の開始日を入力してください。"
+            return
+        }
+
+        isSaving = true
+        defer { isSaving = false }
+        let result = MedicationEditResult(
+            medicationId: medication.id,
+            name: name,
+            dosage: dosage,
+            doseCountPerIntake: intakeCount,
+            startDate: startDate,
+            endDate: endDate.isEmpty ? nil : endDate,
+            notes: notes.isEmpty ? nil : notes,
+            scheduleId: schedule?.id,
+            daysOfWeek: scheduleWeekdays.sorted(),
+            timesPerDay: timesPerDay,
+            timeSlots: slots,
+            scheduleStartDate: scheduleStartDate,
+            scheduleEndDate: scheduleEndDate.isEmpty ? nil : scheduleEndDate
+        )
+        await onSave(result)
     }
 }
 

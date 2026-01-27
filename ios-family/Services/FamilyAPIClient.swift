@@ -115,6 +115,32 @@ final class FamilyAPIClient {
         return try await decode(FamilyMedicationDTO.self, request: request)
     }
 
+    func updateMedication(
+        medicationId: String,
+        name: String,
+        dosage: String,
+        doseCountPerIntake: Int,
+        startDate: String,
+        endDate: String?,
+        notes: String?
+    ) async throws -> FamilyMedicationDTO {
+        let endpoint = baseURL.appendingPathComponent("/medications/\(medicationId)")
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "PATCH"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        attachAuth(to: &request)
+        var body: [String: Any] = [
+            "name": name,
+            "dosage": dosage,
+            "doseCountPerIntake": doseCountPerIntake,
+            "startDate": startDate,
+        ]
+        body["endDate"] = endDate ?? NSNull()
+        body["notes"] = notes ?? NSNull()
+        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+        return try await decode(FamilyMedicationDTO.self, request: request)
+    }
+
     func listSchedules(patientId: String) async throws -> [FamilyScheduleDTO] {
         let endpoint = baseURL.appendingPathComponent("/patients/\(patientId)/schedules")
         var request = URLRequest(url: endpoint)
@@ -144,6 +170,30 @@ final class FamilyAPIClient {
             "startDate": startDate,
         ]
         if let endDate { body["endDate"] = endDate }
+        request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
+        return try await decode(FamilyScheduleDTO.self, request: request)
+    }
+
+    func updateSchedule(
+        scheduleId: String,
+        daysOfWeek: [Int],
+        timesPerDay: Int,
+        timeSlots: [String],
+        startDate: String,
+        endDate: String?
+    ) async throws -> FamilyScheduleDTO {
+        let endpoint = baseURL.appendingPathComponent("/schedules/\(scheduleId)")
+        var request = URLRequest(url: endpoint)
+        request.httpMethod = "PATCH"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        attachAuth(to: &request)
+        var body: [String: Any] = [
+            "daysOfWeek": daysOfWeek,
+            "timesPerDay": timesPerDay,
+            "timeSlots": timeSlots,
+            "startDate": startDate,
+        ]
+        body["endDate"] = endDate ?? NSNull()
         request.httpBody = try JSONSerialization.data(withJSONObject: body, options: [])
         return try await decode(FamilyScheduleDTO.self, request: request)
     }
