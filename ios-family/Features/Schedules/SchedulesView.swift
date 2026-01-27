@@ -10,6 +10,7 @@ struct SchedulesView: View {
     @State private var medicationId: String = ""
     @State private var timesPerDay: String = "1"
     @State private var timeSlots: String = ""
+    @State private var selectedWeekdays = Set([0, 1, 2, 3, 4, 5, 6])
     @State private var startDate: String = ""
     @State private var endDate: String = ""
     @State private var errorMessage: String?
@@ -80,6 +81,21 @@ struct SchedulesView: View {
                     TextField("回数/日", text: $timesPerDay)
                         .keyboardType(.numberPad)
                     TextField("時間 (例: 08:00,20:00)", text: $timeSlots)
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("接種曜日")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        HStack(spacing: 8) {
+                            ForEach(weekdayLabels.indices, id: \.self) { index in
+                                let isSelected = selectedWeekdays.contains(index)
+                                Button(weekdayLabels[index]) {
+                                    toggleWeekday(index)
+                                }
+                                .buttonStyle(.bordered)
+                                .tint(isSelected ? .teal : .gray)
+                            }
+                        }
+                    }
                     TextField("開始日 YYYY-MM-DD", text: $startDate)
                     TextField("終了日 YYYY-MM-DD (任意)", text: $endDate)
                     Button("追加する") {
@@ -91,6 +107,7 @@ struct SchedulesView: View {
                         selectedPatientId.isEmpty ||
                         medicationId.isEmpty ||
                         timeSlots.isEmpty ||
+                        selectedWeekdays.isEmpty ||
                         startDate.isEmpty ||
                         familyJwtToken.isEmpty
                     )
@@ -150,11 +167,13 @@ struct SchedulesView: View {
             errorMessage = "時間の数が回数/日と一致していません。"
             return
         }
+        let days = selectedWeekdays.sorted()
         do {
             let client = try FamilyAPIClient(token: familyJwtToken)
             let schedule = try await client.createSchedule(
                 patientId: selectedPatientId,
                 medicationId: medicationId,
+                daysOfWeek: days,
                 timesPerDay: count,
                 timeSlots: slots,
                 startDate: startDate,
@@ -166,6 +185,16 @@ struct SchedulesView: View {
             timeSlots = ""
         } catch {
             errorMessage = "予定の追加に失敗しました。"
+        }
+    }
+
+    private let weekdayLabels = ["日", "月", "火", "水", "木", "金", "土"]
+
+    private func toggleWeekday(_ index: Int) {
+        if selectedWeekdays.contains(index) {
+            selectedWeekdays.remove(index)
+        } else {
+            selectedWeekdays.insert(index)
         }
     }
 }
