@@ -8980,10 +8980,12 @@ export namespace Prisma {
   }
 
   export type ScheduleAvgAggregateOutputType = {
+    daysOfWeek: number | null
     timesPerDay: number | null
   }
 
   export type ScheduleSumAggregateOutputType = {
+    daysOfWeek: number[]
     timesPerDay: number | null
   }
 
@@ -9010,6 +9012,7 @@ export namespace Prisma {
   export type ScheduleCountAggregateOutputType = {
     id: number
     medicationId: number
+    daysOfWeek: number
     timesPerDay: number
     timeSlots: number
     startDate: number
@@ -9021,10 +9024,12 @@ export namespace Prisma {
 
 
   export type ScheduleAvgAggregateInputType = {
+    daysOfWeek?: true
     timesPerDay?: true
   }
 
   export type ScheduleSumAggregateInputType = {
+    daysOfWeek?: true
     timesPerDay?: true
   }
 
@@ -9051,6 +9056,7 @@ export namespace Prisma {
   export type ScheduleCountAggregateInputType = {
     id?: true
     medicationId?: true
+    daysOfWeek?: true
     timesPerDay?: true
     timeSlots?: true
     startDate?: true
@@ -9149,6 +9155,7 @@ export namespace Prisma {
   export type ScheduleGroupByOutputType = {
     id: string
     medicationId: string
+    daysOfWeek: number[]
     timesPerDay: number
     timeSlots: Date[]
     startDate: Date
@@ -9179,6 +9186,7 @@ export namespace Prisma {
   export type ScheduleSelect<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     medicationId?: boolean
+    daysOfWeek?: boolean
     timesPerDay?: boolean
     timeSlots?: boolean
     startDate?: boolean
@@ -9193,6 +9201,7 @@ export namespace Prisma {
   export type ScheduleSelectCreateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     medicationId?: boolean
+    daysOfWeek?: boolean
     timesPerDay?: boolean
     timeSlots?: boolean
     startDate?: boolean
@@ -9205,6 +9214,7 @@ export namespace Prisma {
   export type ScheduleSelectUpdateManyAndReturn<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetSelect<{
     id?: boolean
     medicationId?: boolean
+    daysOfWeek?: boolean
     timesPerDay?: boolean
     timeSlots?: boolean
     startDate?: boolean
@@ -9217,6 +9227,7 @@ export namespace Prisma {
   export type ScheduleSelectScalar = {
     id?: boolean
     medicationId?: boolean
+    daysOfWeek?: boolean
     timesPerDay?: boolean
     timeSlots?: boolean
     startDate?: boolean
@@ -9225,7 +9236,7 @@ export namespace Prisma {
     createdAt?: boolean
   }
 
-  export type ScheduleOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "medicationId" | "timesPerDay" | "timeSlots" | "startDate" | "endDate" | "isActive" | "createdAt", ExtArgs["result"]["schedule"]>
+  export type ScheduleOmit<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = $Extensions.GetOmit<"id" | "medicationId" | "daysOfWeek" | "timesPerDay" | "timeSlots" | "startDate" | "endDate" | "isActive" | "createdAt", ExtArgs["result"]["schedule"]>
   export type ScheduleInclude<ExtArgs extends $Extensions.InternalArgs = $Extensions.DefaultArgs> = {
     medication?: boolean | MedicationDefaultArgs<ExtArgs>
     doseInstances?: boolean | Schedule$doseInstancesArgs<ExtArgs>
@@ -9247,6 +9258,7 @@ export namespace Prisma {
     scalars: $Extensions.GetPayloadResult<{
       id: string
       medicationId: string
+      daysOfWeek: number[]
       timesPerDay: number
       timeSlots: Date[]
       startDate: Date
@@ -9680,6 +9692,7 @@ export namespace Prisma {
   interface ScheduleFieldRefs {
     readonly id: FieldRef<"Schedule", 'String'>
     readonly medicationId: FieldRef<"Schedule", 'String'>
+    readonly daysOfWeek: FieldRef<"Schedule", 'Int[]'>
     readonly timesPerDay: FieldRef<"Schedule", 'Int'>
     readonly timeSlots: FieldRef<"Schedule", 'DateTime[]'>
     readonly startDate: FieldRef<"Schedule", 'DateTime'>
@@ -14681,6 +14694,7 @@ export namespace Prisma {
   export const ScheduleScalarFieldEnum: {
     id: 'id',
     medicationId: 'medicationId',
+    daysOfWeek: 'daysOfWeek',
     timesPerDay: 'timesPerDay',
     timeSlots: 'timeSlots',
     startDate: 'startDate',
@@ -15324,6 +15338,7 @@ export namespace Prisma {
     NOT?: ScheduleWhereInput | ScheduleWhereInput[]
     id?: UuidFilter<"Schedule"> | string
     medicationId?: UuidFilter<"Schedule"> | string
+    daysOfWeek?: IntNullableListFilter<"Schedule">
     timesPerDay?: IntFilter<"Schedule"> | number
     timeSlots?: DateTimeNullableListFilter<"Schedule">
     startDate?: DateTimeFilter<"Schedule"> | Date | string
@@ -15337,6 +15352,7 @@ export namespace Prisma {
   export type ScheduleOrderByWithRelationInput = {
     id?: SortOrder
     medicationId?: SortOrder
+    daysOfWeek?: SortOrder
     timesPerDay?: SortOrder
     timeSlots?: SortOrder
     startDate?: SortOrder
@@ -15353,6 +15369,7 @@ export namespace Prisma {
     OR?: ScheduleWhereInput[]
     NOT?: ScheduleWhereInput | ScheduleWhereInput[]
     medicationId?: UuidFilter<"Schedule"> | string
+    daysOfWeek?: IntNullableListFilter<"Schedule">
     timesPerDay?: IntFilter<"Schedule"> | number
     timeSlots?: DateTimeNullableListFilter<"Schedule">
     startDate?: DateTimeFilter<"Schedule"> | Date | string
@@ -15366,6 +15383,7 @@ export namespace Prisma {
   export type ScheduleOrderByWithAggregationInput = {
     id?: SortOrder
     medicationId?: SortOrder
+    daysOfWeek?: SortOrder
     timesPerDay?: SortOrder
     timeSlots?: SortOrder
     startDate?: SortOrder
@@ -15385,6 +15403,7 @@ export namespace Prisma {
     NOT?: ScheduleScalarWhereWithAggregatesInput | ScheduleScalarWhereWithAggregatesInput[]
     id?: UuidWithAggregatesFilter<"Schedule"> | string
     medicationId?: UuidWithAggregatesFilter<"Schedule"> | string
+    daysOfWeek?: IntNullableListFilter<"Schedule">
     timesPerDay?: IntWithAggregatesFilter<"Schedule"> | number
     timeSlots?: DateTimeNullableListFilter<"Schedule">
     startDate?: DateTimeWithAggregatesFilter<"Schedule"> | Date | string
@@ -16099,6 +16118,7 @@ export namespace Prisma {
 
   export type ScheduleCreateInput = {
     id?: string
+    daysOfWeek?: ScheduleCreatedaysOfWeekInput | number[]
     timesPerDay: number
     timeSlots?: ScheduleCreatetimeSlotsInput | Date[] | string[]
     startDate: Date | string
@@ -16112,6 +16132,7 @@ export namespace Prisma {
   export type ScheduleUncheckedCreateInput = {
     id?: string
     medicationId: string
+    daysOfWeek?: ScheduleCreatedaysOfWeekInput | number[]
     timesPerDay: number
     timeSlots?: ScheduleCreatetimeSlotsInput | Date[] | string[]
     startDate: Date | string
@@ -16123,6 +16144,7 @@ export namespace Prisma {
 
   export type ScheduleUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
+    daysOfWeek?: ScheduleUpdatedaysOfWeekInput | number[]
     timesPerDay?: IntFieldUpdateOperationsInput | number
     timeSlots?: ScheduleUpdatetimeSlotsInput | Date[] | string[]
     startDate?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -16136,6 +16158,7 @@ export namespace Prisma {
   export type ScheduleUncheckedUpdateInput = {
     id?: StringFieldUpdateOperationsInput | string
     medicationId?: StringFieldUpdateOperationsInput | string
+    daysOfWeek?: ScheduleUpdatedaysOfWeekInput | number[]
     timesPerDay?: IntFieldUpdateOperationsInput | number
     timeSlots?: ScheduleUpdatetimeSlotsInput | Date[] | string[]
     startDate?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -16148,6 +16171,7 @@ export namespace Prisma {
   export type ScheduleCreateManyInput = {
     id?: string
     medicationId: string
+    daysOfWeek?: ScheduleCreatedaysOfWeekInput | number[]
     timesPerDay: number
     timeSlots?: ScheduleCreatetimeSlotsInput | Date[] | string[]
     startDate: Date | string
@@ -16158,6 +16182,7 @@ export namespace Prisma {
 
   export type ScheduleUpdateManyMutationInput = {
     id?: StringFieldUpdateOperationsInput | string
+    daysOfWeek?: ScheduleUpdatedaysOfWeekInput | number[]
     timesPerDay?: IntFieldUpdateOperationsInput | number
     timeSlots?: ScheduleUpdatetimeSlotsInput | Date[] | string[]
     startDate?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -16169,6 +16194,7 @@ export namespace Prisma {
   export type ScheduleUncheckedUpdateManyInput = {
     id?: StringFieldUpdateOperationsInput | string
     medicationId?: StringFieldUpdateOperationsInput | string
+    daysOfWeek?: ScheduleUpdatedaysOfWeekInput | number[]
     timesPerDay?: IntFieldUpdateOperationsInput | number
     timeSlots?: ScheduleUpdatetimeSlotsInput | Date[] | string[]
     startDate?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -16957,6 +16983,14 @@ export namespace Prisma {
     _max?: NestedBoolFilter<$PrismaModel>
   }
 
+  export type IntNullableListFilter<$PrismaModel = never> = {
+    equals?: number[] | ListIntFieldRefInput<$PrismaModel> | null
+    has?: number | IntFieldRefInput<$PrismaModel> | null
+    hasEvery?: number[] | ListIntFieldRefInput<$PrismaModel>
+    hasSome?: number[] | ListIntFieldRefInput<$PrismaModel>
+    isEmpty?: boolean
+  }
+
   export type DateTimeNullableListFilter<$PrismaModel = never> = {
     equals?: Date[] | string[] | ListDateTimeFieldRefInput<$PrismaModel> | null
     has?: Date | string | DateTimeFieldRefInput<$PrismaModel> | null
@@ -16973,6 +17007,7 @@ export namespace Prisma {
   export type ScheduleCountOrderByAggregateInput = {
     id?: SortOrder
     medicationId?: SortOrder
+    daysOfWeek?: SortOrder
     timesPerDay?: SortOrder
     timeSlots?: SortOrder
     startDate?: SortOrder
@@ -16982,6 +17017,7 @@ export namespace Prisma {
   }
 
   export type ScheduleAvgOrderByAggregateInput = {
+    daysOfWeek?: SortOrder
     timesPerDay?: SortOrder
   }
 
@@ -17006,6 +17042,7 @@ export namespace Prisma {
   }
 
   export type ScheduleSumOrderByAggregateInput = {
+    daysOfWeek?: SortOrder
     timesPerDay?: SortOrder
   }
 
@@ -17863,6 +17900,10 @@ export namespace Prisma {
     deleteMany?: DoseInstanceScalarWhereInput | DoseInstanceScalarWhereInput[]
   }
 
+  export type ScheduleCreatedaysOfWeekInput = {
+    set: number[]
+  }
+
   export type ScheduleCreatetimeSlotsInput = {
     set: Date[] | string[]
   }
@@ -17885,6 +17926,11 @@ export namespace Prisma {
     connectOrCreate?: DoseInstanceCreateOrConnectWithoutScheduleInput | DoseInstanceCreateOrConnectWithoutScheduleInput[]
     createMany?: DoseInstanceCreateManyScheduleInputEnvelope
     connect?: DoseInstanceWhereUniqueInput | DoseInstanceWhereUniqueInput[]
+  }
+
+  export type ScheduleUpdatedaysOfWeekInput = {
+    set?: number[]
+    push?: number | number[]
   }
 
   export type ScheduleUpdatetimeSlotsInput = {
@@ -19306,6 +19352,7 @@ export namespace Prisma {
 
   export type ScheduleCreateWithoutMedicationInput = {
     id?: string
+    daysOfWeek?: ScheduleCreatedaysOfWeekInput | number[]
     timesPerDay: number
     timeSlots?: ScheduleCreatetimeSlotsInput | Date[] | string[]
     startDate: Date | string
@@ -19317,6 +19364,7 @@ export namespace Prisma {
 
   export type ScheduleUncheckedCreateWithoutMedicationInput = {
     id?: string
+    daysOfWeek?: ScheduleCreatedaysOfWeekInput | number[]
     timesPerDay: number
     timeSlots?: ScheduleCreatetimeSlotsInput | Date[] | string[]
     startDate: Date | string
@@ -19444,6 +19492,7 @@ export namespace Prisma {
     NOT?: ScheduleScalarWhereInput | ScheduleScalarWhereInput[]
     id?: UuidFilter<"Schedule"> | string
     medicationId?: UuidFilter<"Schedule"> | string
+    daysOfWeek?: IntNullableListFilter<"Schedule">
     timesPerDay?: IntFilter<"Schedule"> | number
     timeSlots?: DateTimeNullableListFilter<"Schedule">
     startDate?: DateTimeFilter<"Schedule"> | Date | string
@@ -19648,6 +19697,7 @@ export namespace Prisma {
 
   export type ScheduleCreateWithoutDoseInstancesInput = {
     id?: string
+    daysOfWeek?: ScheduleCreatedaysOfWeekInput | number[]
     timesPerDay: number
     timeSlots?: ScheduleCreatetimeSlotsInput | Date[] | string[]
     startDate: Date | string
@@ -19660,6 +19710,7 @@ export namespace Prisma {
   export type ScheduleUncheckedCreateWithoutDoseInstancesInput = {
     id?: string
     medicationId: string
+    daysOfWeek?: ScheduleCreatedaysOfWeekInput | number[]
     timesPerDay: number
     timeSlots?: ScheduleCreatetimeSlotsInput | Date[] | string[]
     startDate: Date | string
@@ -19786,6 +19837,7 @@ export namespace Prisma {
 
   export type ScheduleUpdateWithoutDoseInstancesInput = {
     id?: StringFieldUpdateOperationsInput | string
+    daysOfWeek?: ScheduleUpdatedaysOfWeekInput | number[]
     timesPerDay?: IntFieldUpdateOperationsInput | number
     timeSlots?: ScheduleUpdatetimeSlotsInput | Date[] | string[]
     startDate?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -19798,6 +19850,7 @@ export namespace Prisma {
   export type ScheduleUncheckedUpdateWithoutDoseInstancesInput = {
     id?: StringFieldUpdateOperationsInput | string
     medicationId?: StringFieldUpdateOperationsInput | string
+    daysOfWeek?: ScheduleUpdatedaysOfWeekInput | number[]
     timesPerDay?: IntFieldUpdateOperationsInput | number
     timeSlots?: ScheduleUpdatetimeSlotsInput | Date[] | string[]
     startDate?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -20497,6 +20550,7 @@ export namespace Prisma {
 
   export type ScheduleCreateManyMedicationInput = {
     id?: string
+    daysOfWeek?: ScheduleCreatedaysOfWeekInput | number[]
     timesPerDay: number
     timeSlots?: ScheduleCreatetimeSlotsInput | Date[] | string[]
     startDate: Date | string
@@ -20516,6 +20570,7 @@ export namespace Prisma {
 
   export type ScheduleUpdateWithoutMedicationInput = {
     id?: StringFieldUpdateOperationsInput | string
+    daysOfWeek?: ScheduleUpdatedaysOfWeekInput | number[]
     timesPerDay?: IntFieldUpdateOperationsInput | number
     timeSlots?: ScheduleUpdatetimeSlotsInput | Date[] | string[]
     startDate?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -20527,6 +20582,7 @@ export namespace Prisma {
 
   export type ScheduleUncheckedUpdateWithoutMedicationInput = {
     id?: StringFieldUpdateOperationsInput | string
+    daysOfWeek?: ScheduleUpdatedaysOfWeekInput | number[]
     timesPerDay?: IntFieldUpdateOperationsInput | number
     timeSlots?: ScheduleUpdatetimeSlotsInput | Date[] | string[]
     startDate?: DateTimeFieldUpdateOperationsInput | Date | string
@@ -20538,6 +20594,7 @@ export namespace Prisma {
 
   export type ScheduleUncheckedUpdateManyWithoutMedicationInput = {
     id?: StringFieldUpdateOperationsInput | string
+    daysOfWeek?: ScheduleUpdatedaysOfWeekInput | number[]
     timesPerDay?: IntFieldUpdateOperationsInput | number
     timeSlots?: ScheduleUpdatetimeSlotsInput | Date[] | string[]
     startDate?: DateTimeFieldUpdateOperationsInput | Date | string

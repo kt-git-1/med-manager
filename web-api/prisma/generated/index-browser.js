@@ -179,6 +179,7 @@ exports.Prisma.MedicationScalarFieldEnum = {
 exports.Prisma.ScheduleScalarFieldEnum = {
   id: 'id',
   medicationId: 'medicationId',
+  daysOfWeek: 'daysOfWeek',
   timesPerDay: 'timesPerDay',
   timeSlots: 'timeSlots',
   startDate: 'startDate',
