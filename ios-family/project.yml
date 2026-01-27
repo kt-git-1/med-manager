@@ -17,6 +17,7 @@ targets:
     platform: iOS
     sources:
       - MedFamily
+      - Features/Inventory
       - Features
       - Components
       - Services

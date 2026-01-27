@@ -3,7 +3,7 @@ import type { Prisma, PrismaClient } from "@/prisma/generated";
 type PrismaLike = Prisma.TransactionClient | PrismaClient;
 
 type ScheduleSummary = {
-  timeSlots: string[];
+  timeSlots: Date[];
   timesPerDay: number;
   isActive: boolean;
 };
