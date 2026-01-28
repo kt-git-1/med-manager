@@ -27,7 +27,7 @@ struct FamilyHeaderSection: View {
 struct FamilyAppLogo: View {
     let size: CGFloat
 
-    init(size: CGFloat = 64) {
+    init(size: CGFloat = 80) {
         self.size = size
     }
 
@@ -124,7 +124,7 @@ struct FamilyLoadingOverlay: View {
             Color.black.opacity(0.2)
                 .ignoresSafeArea()
             VStack(spacing: 12) {
-                FamilyAppLogo(size: 64)
+                FamilyAppLogo(size: 80)
                 ProgressView()
                 Text(message)
                     .font(.headline)

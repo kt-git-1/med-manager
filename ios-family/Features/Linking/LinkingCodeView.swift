@@ -110,7 +110,7 @@ struct LinkingCodeView: View {
                     Color.black.opacity(0.2)
                         .ignoresSafeArea()
                     VStack(spacing: 12) {
-                        FamilyAppLogo(size: 64)
+                        FamilyAppLogo(size: 80)
                         ProgressView()
                         Text("更新中")
                             .font(.headline)

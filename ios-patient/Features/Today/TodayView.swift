@@ -213,9 +213,13 @@ struct TodayView: View {
                     clientUuid: UUID(uuidString: payload["clientUuid"] ?? "") ?? UUID(),
                     payload: data
                 ))
-                errorMessage = "オフラインのため送信待ちに保存しました。"
+                await MainActor.run {
+                    errorMessage = "オフラインのため送信待ちに保存しました。"
+                }
             } else {
-                errorMessage = "送信に失敗しました。"
+                await MainActor.run {
+                    errorMessage = "送信に失敗しました。"
+                }
             }
             await MainActor.run {
                 sendingIds.remove(item.id)
