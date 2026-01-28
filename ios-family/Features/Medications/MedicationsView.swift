@@ -72,7 +72,7 @@ struct MedicationsView: View {
                     Color.black.opacity(0.2)
                         .ignoresSafeArea()
                     VStack(spacing: 12) {
-                        FamilyAppLogo(size: 64)
+                        FamilyAppLogo(size: 80)
                         ProgressView()
                         Text("更新中")
                             .font(.headline)
@@ -301,7 +301,7 @@ struct MedicationsView: View {
         errorMessage = nil
         let slots = PresetTime.orderedSelection(selectedPresetTimes).map { $0.timeString }
         let count = slots.count
-        guard count > 0, slots.count == count else {
+        guard !slots.isEmpty else {
             errorMessage = "時間の数が回数/日と一致していません。"
             return
         }

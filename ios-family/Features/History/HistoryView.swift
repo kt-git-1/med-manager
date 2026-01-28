@@ -49,7 +49,7 @@ struct HistoryView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack(alignment: .top) {
+            ZStack {
                 List {
                     FamilyHeaderSection(
                         systemImage: "calendar.circle.fill",
@@ -76,6 +76,8 @@ struct HistoryView: View {
                 }
                 .disabled(isLoading)
                 FamilyLoadingOverlay(isLoading: isLoading)
+            }
+            .overlay(alignment: .top) {
                 if let bannerMessage, isBannerVisible {
                     bannerView(message: bannerMessage)
                 }
@@ -318,10 +320,17 @@ struct HistoryView: View {
     }
 
     private func itemsForDate(_ date: Date) -> [FamilyAdherenceLogDTO] {
-        adherenceItems.filter { item in
-            guard let parsed = parseDate(item.takenAt) else { return false }
-            return calendar.isDate(parsed, inSameDayAs: date)
+        itemsByDate[calendar.startOfDay(for: date)] ?? []
+    }
+
+    private var itemsByDate: [Date: [FamilyAdherenceLogDTO]] {
+        var grouped: [Date: [FamilyAdherenceLogDTO]] = [:]
+        for item in adherenceItems {
+            guard let parsed = parseDate(item.takenAt) else { continue }
+            let day = calendar.startOfDay(for: parsed)
+            grouped[day, default: []].append(item)
         }
+        return grouped
     }
 
     private func parseDate(_ value: String) -> Date? {
