@@ -9,7 +9,7 @@ struct FamilyHeaderSection: View {
         Section {
             HStack(spacing: 12) {
                 Image(systemName: systemImage)
-                    .foregroundStyle(.white, .teal)
+                    .foregroundStyle(.teal)
                     .font(.title2)
                 VStack(alignment: .leading, spacing: 4) {
                     Text(title)
@@ -21,6 +21,27 @@ struct FamilyHeaderSection: View {
             }
             .padding(.vertical, 4)
         }
+    }
+}
+
+struct FamilyAppLogo: View {
+    let size: CGFloat
+
+    init(size: CGFloat = 64) {
+        self.size = size
+    }
+
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(Color.clear)
+            Image("LoadIcon")
+                .resizable()
+                .scaledToFit()
+                .padding(size * 0.18)
+        }
+        .frame(width: size, height: size)
+        .overlay(Circle().stroke(Color.clear, lineWidth: 0))
     }
 }
 
@@ -103,10 +124,7 @@ struct FamilyLoadingOverlay: View {
             Color.black.opacity(0.2)
                 .ignoresSafeArea()
             VStack(spacing: 12) {
-                Image("AppLogo")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 64, height: 64)
+                FamilyAppLogo(size: 64)
                 ProgressView()
                 Text(message)
                     .font(.headline)

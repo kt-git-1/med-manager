@@ -1,4 +1,13 @@
 import SwiftUI
+
+private struct LocalTabBarInteractionBlockKey: PreferenceKey {
+    static var defaultValue: Bool = false
+    static func reduce(value: inout Bool, nextValue: () -> Bool) {
+        // Prefer the latest value set in the view hierarchy
+        value = nextValue() || value
+    }
+}
+
 #if canImport(UIKit)
 import UIKit
 #endif
@@ -34,7 +43,7 @@ struct ContentView: View {
                             .ignoresSafeArea()
                     }
                 }
-                .onPreferenceChange(TabBarInteractionPreferenceKey.self) { value in
+                .onPreferenceChange(LocalTabBarInteractionBlockKey.self) { (value: Bool) in
                     isTabInteractionBlocked = value
                 }
             }
@@ -72,6 +81,19 @@ private struct DismissKeyboardOnTapModifier: ViewModifier {
                 #endif
             }
         )
+    }
+}
+
+private struct TabBarInteractionBlocker: ViewModifier {
+    let isBlocked: Bool
+    func body(content: Content) -> some View {
+        content.preference(key: LocalTabBarInteractionBlockKey.self, value: isBlocked)
+    }
+}
+
+extension View {
+    func tabBarInteractionBlocked(_ isBlocked: Bool) -> some View {
+        modifier(TabBarInteractionBlocker(isBlocked: isBlocked))
     }
 }
 

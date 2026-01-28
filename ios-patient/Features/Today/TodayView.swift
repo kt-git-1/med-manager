@@ -11,109 +11,47 @@ struct TodayView: View {
     private let scheduler = NotificationScheduler()
     private let overdueInterval: TimeInterval = 60 * 60
 
+    private enum Formatters {
+        static let isoDate: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.calendar = Calendar(identifier: .gregorian)
+            formatter.timeZone = TimeZone.current
+            formatter.dateFormat = "yyyy-MM-dd"
+            return formatter
+        }()
+        static let isoDateTime: ISO8601DateFormatter = {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            return formatter
+        }()
+        static let isoDateTimeFallback: ISO8601DateFormatter = {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime]
+            return formatter
+        }()
+        static let timeJapan: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
+            formatter.dateFormat = "HH:mm"
+            return formatter
+        }()
+        static let timeLocal: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.timeZone = TimeZone.current
+            formatter.dateFormat = "HH:mm"
+            return formatter
+        }()
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
-                List {
-                    Section {
-                        HStack(spacing: 12) {
-                            Image(systemName: "sun.max.fill")
-                                .foregroundStyle(.white, .teal)
-                                .font(.title2)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("今日の服薬")
-                                    .font(.headline)
-                                Text("予定に合わせて反応を記録します。")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
-                    if let errorMessage {
-                        Text(errorMessage)
-                            .foregroundStyle(.red)
-                    }
-                    Section(header: Text("今日の予定")) {
-                        if doseInstances.isEmpty {
-                            Text("予定がありません")
-                        } else {
-                            ForEach(sortedDoseInstances, id: \.id) { item in
-                                VStack(alignment: .leading, spacing: 8) {
-                                    Text(item.medicationName ?? "お薬")
-                                        .font(.headline)
-                                    HStack(spacing: 8) {
-                                        Text(formatTime(item.scheduledFor))
-                                            .font(.subheadline)
-                                            .foregroundStyle(.secondary)
-                                        if let timeSlot = formatTimeSlot(item.scheduledFor),
-                                           let presetLabel = presetLabel(for: timeSlot) {
-                                            Text(presetLabel)
-                                                .font(.caption)
-                                                .padding(.horizontal, 8)
-                                                .padding(.vertical, 4)
-                                                .background(.teal.opacity(0.12))
-                                                .clipShape(Capsule())
-                                                .foregroundStyle(.teal)
-                                        }
-                                    }
-                                    if item.status == "taken" {
-                                        Label("服用済み", systemImage: "checkmark.circle.fill")
-                                            .foregroundStyle(.green)
-                                    } else if item.status == "skipped" {
-                                        Label("スキップ済み", systemImage: "minus.circle.fill")
-                                            .foregroundStyle(.secondary)
-                                    } else {
-                                        if isOverdue(item) {
-                                            Label("未服用", systemImage: "exclamationmark.circle.fill")
-                                                .foregroundStyle(.orange)
-                                        }
-                                        HStack {
-                                            Button("飲んだ") {
-                                                Task { await sendAdherence(item, action: "taken") }
-                                            }
-                                            .buttonStyle(.borderedProminent)
-                                            .tint(.teal)
-                                            .controlSize(.large)
-                                            .font(.title3)
-                                            .padding(.vertical, 6)
-                                            .padding(.horizontal, 8)
-                                            .disabled(sendingIds.contains(item.id) || isLoading)
-                                            Button("スキップ") {
-                                                Task { await sendAdherence(item, action: "skipped") }
-                                            }
-                                            .buttonStyle(.bordered)
-                                            .tint(.teal)
-                                            .disabled(sendingIds.contains(item.id) || isLoading)
-                                            if sendingIds.contains(item.id) {
-                                                ProgressView()
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                todayList
                 if isLoading {
-                    Color.black.opacity(0.2)
-                        .ignoresSafeArea()
-                    VStack(spacing: 12) {
-                        Image("AppLogo")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 64, height: 64)
-                        ProgressView()
-                        Text("更新中")
-                            .font(.headline)
-                    }
-                    .padding(20)
-                    .background(.ultraThinMaterial)
-                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                    .shadow(radius: 8)
+                    loadingOverlay
                 }
             }
-            .blockTabBarInteraction(isLoading)
+            .preference(key: TabBarInteractionBlockKey.self, value: isLoading)
             .navigationTitle("今日")
             .tint(.teal)
             .listStyle(.insetGrouped)
@@ -122,14 +60,71 @@ struct TodayView: View {
                     Task { await reload() }
                 }
                 .disabled(isLoading)
-                Button("ログアウト") {
-                    sessionStore.clear()
-                }
             }
             .task {
                 await reload()
             }
         }
+    }
+
+    private var todayList: some View {
+        List {
+            Section { todayHeaderRow }
+            if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
+            Section(header: Text("今日の予定")) {
+                if doseInstances.isEmpty {
+                    Text("予定がありません")
+                } else {
+                    ForEach(sortedDoseInstances, id: \.id) { item in
+                        TodayDoseRow(
+                            item: item,
+                            isLoading: isLoading,
+                            isSending: sendingIds.contains(item.id),
+                            formatTime: formatTime,
+                            formatTimeSlot: formatTimeSlot,
+                            presetLabel: presetLabel,
+                            isOverdue: isOverdue,
+                            onTaken: { Task { await sendAdherence(item, action: "taken") } },
+                            onSkipped: { Task { await sendAdherence(item, action: "skipped") } }
+                        )
+                    }
+                }
+            }
+            signOutSection
+        }
+    }
+
+    private var loadingOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.2).ignoresSafeArea()
+            VStack(spacing: 12) {
+                Image("LoadIcon")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 64, height: 64)
+                ProgressView()
+                Text("更新中").font(.headline)
+            }
+            .padding(20)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 16))
+            .shadow(radius: 8)
+        }
+    }
+
+    private var todayHeaderRow: some View {
+        HStack(spacing: 12) {
+            Image(systemName: "sun.max.fill")
+                .foregroundStyle(.teal)
+                .font(.title2)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("今日の服薬").font(.headline)
+                Text("予定に合わせて反応を記録します。")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 4)
     }
 
     private func reload() async {
@@ -156,6 +151,17 @@ struct TodayView: View {
             )
         } catch {
             errorMessage = "今日の予定取得に失敗しました。"
+        }
+    }
+
+    private var signOutSection: some View {
+        Section {
+            Button(role: .destructive) {
+                sessionStore.clear()
+            } label: {
+                Text("ログアウト")
+            }
+            .disabled(isLoading)
         }
     }
 
@@ -260,15 +266,11 @@ struct TodayView: View {
     }
 
     private func isoDate() -> String {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.timeZone = TimeZone.current
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: Date())
+        Formatters.isoDate.string(from: Date())
     }
 
     private func isoDateTime() -> String {
-        ISO8601DateFormatter().string(from: Date())
+        Formatters.isoDateTime.string(from: Date())
     }
 
     private var sortedDoseInstances: [DoseInstanceDTO] {
@@ -295,28 +297,20 @@ struct TodayView: View {
     }
 
     private func parseDate(_ value: String) -> Date? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: value) {
+        if let date = Formatters.isoDateTime.date(from: value) {
             return date
         }
-        return ISO8601DateFormatter().date(from: value)
+        return Formatters.isoDateTimeFallback.date(from: value)
     }
 
     private func formatTime(_ value: String) -> String {
         guard let date = parseDate(value) else { return value }
-        let formatter = DateFormatter()
-        formatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
-        formatter.dateFormat = "HH:mm"
-        return formatter.string(from: date)
+        return Formatters.timeJapan.string(from: date)
     }
 
     private func formatTimeSlot(_ value: String) -> String? {
         guard let date = parseDate(value) else { return nil }
-        let formatter = DateFormatter()
-        formatter.timeZone = TimeZone.current
-        formatter.dateFormat = "HH:mm"
-        return formatter.string(from: date)
+        return Formatters.timeLocal.string(from: date)
     }
 
     private func presetLabel(for timeSlot: String) -> String? {
@@ -332,6 +326,64 @@ struct TodayView: View {
         }
     }
 }
+
+private struct TodayDoseRow: View {
+    let item: DoseInstanceDTO
+    let isLoading: Bool
+    let isSending: Bool
+    let formatTime: (String) -> String
+    let formatTimeSlot: (String) -> String?
+    let presetLabel: (String) -> String?
+    let isOverdue: (DoseInstanceDTO) -> Bool
+    let onTaken: () -> Void
+    let onSkipped: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(item.medicationName ?? "お薬").font(.headline)
+            HStack(spacing: 8) {
+                Text(formatTime(item.scheduledFor))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                if let timeSlot = formatTimeSlot(item.scheduledFor),
+                   let label = presetLabel(timeSlot) {
+                    Text(label)
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(.teal.opacity(0.12))
+                        .clipShape(Capsule())
+                        .foregroundStyle(.teal)
+                }
+            }
+            if item.status == "taken" {
+                Label("服用済み", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
+            } else if item.status == "skipped" {
+                Label("スキップ済み", systemImage: "minus.circle.fill").foregroundStyle(.secondary)
+            } else {
+                if isOverdue(item) {
+                    Label("未服用", systemImage: "exclamationmark.circle.fill").foregroundStyle(.orange)
+                }
+                HStack {
+                    Button("飲んだ", action: onTaken)
+                        .buttonStyle(.borderedProminent)
+                        .tint(.teal)
+                        .controlSize(.large)
+                        .font(.title3)
+                        .padding(.vertical, 6)
+                        .padding(.horizontal, 8)
+                        .disabled(isSending || isLoading)
+                    Button("スキップ", action: onSkipped)
+                        .buttonStyle(.bordered)
+                        .tint(.teal)
+                        .disabled(isSending || isLoading)
+                    if isSending { ProgressView() }
+                }
+            }
+        }
+    }
+}
+
 
 #Preview {
     TodayView(apiBaseURL: "http://localhost:3000", sessionStore: PatientSessionStore())

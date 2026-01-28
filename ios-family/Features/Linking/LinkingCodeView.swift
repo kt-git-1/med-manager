@@ -22,7 +22,7 @@ struct LinkingCodeView: View {
                     Section {
                         HStack(spacing: 12) {
                             Image(systemName: "link.circle.fill")
-                                .foregroundStyle(.white, .teal)
+                                .foregroundStyle(.teal)
                                 .font(.title2)
                             VStack(alignment: .leading, spacing: 4) {
                                 Text("連携コードを発行")
@@ -94,6 +94,7 @@ struct LinkingCodeView: View {
                         }
                     }
                     }
+                    signOutSection
                 }
                 .navigationTitle("連携")
                 .tint(.teal)
@@ -109,10 +110,7 @@ struct LinkingCodeView: View {
                     Color.black.opacity(0.2)
                         .ignoresSafeArea()
                     VStack(spacing: 12) {
-                        Image("AppLogo")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 64, height: 64)
+                        FamilyAppLogo(size: 64)
                         ProgressView()
                         Text("更新中")
                             .font(.headline)
@@ -128,10 +126,6 @@ struct LinkingCodeView: View {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Button("更新") {
                         Task { await reloadAll() }
-                    }
-                    .disabled(isLoading)
-                    Button("ログアウト") {
-                        Task { await handleSignOut() }
                     }
                     .disabled(isLoading)
                 }
@@ -221,6 +215,19 @@ struct LinkingCodeView: View {
         isLoading = true
         defer { isLoading = false }
         await loadPatients()
+    }
+}
+
+private extension LinkingCodeView {
+    var signOutSection: some View {
+        Section {
+            Button(role: .destructive) {
+                Task { await handleSignOut() }
+            } label: {
+                Text("ログアウト")
+            }
+            .disabled(isLoading)
+        }
     }
 }
 

@@ -13,7 +13,7 @@ struct LinkingView: View {
                 Section {
                     HStack(spacing: 12) {
                         Image(systemName: "person.crop.circle.badge.checkmark")
-                            .foregroundStyle(.white, .teal)
+                            .foregroundStyle(.teal)
                             .font(.title2)
                         VStack(alignment: .leading, spacing: 4) {
                             Text("本人アプリの連携")

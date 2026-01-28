@@ -12,6 +12,39 @@ struct HistoryView: View {
     @State private var selectedDate = Date()
     private let refreshTimer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
+    private enum Formatters {
+        static let monthLabel: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "ja_JP")
+            formatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
+            formatter.dateFormat = "yyyy年M月"
+            return formatter
+        }()
+        static let dayLabel: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "ja_JP")
+            formatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
+            formatter.dateFormat = "yyyy/MM/dd (EEE)"
+            return formatter
+        }()
+        static let isoDateTime: ISO8601DateFormatter = {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            return formatter
+        }()
+        static let isoDateTimeFallback: ISO8601DateFormatter = {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime]
+            return formatter
+        }()
+        static let timeJapan: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
+            formatter.dateFormat = "HH:mm"
+            return formatter
+        }()
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -27,13 +60,14 @@ struct HistoryView: View {
                     } else {
                         calendarSection
                     }
+                    signOutSection
                 }
                 .disabled(isLoading)
                 if isLoading {
                     Color.black.opacity(0.2)
                         .ignoresSafeArea()
                     VStack(spacing: 12) {
-                        Image("AppLogo")
+                        Image("LoadIcon")
                             .resizable()
                             .scaledToFit()
                             .frame(width: 64, height: 64)
@@ -47,16 +81,10 @@ struct HistoryView: View {
                     .shadow(radius: 8)
                 }
             }
-            .blockTabBarInteraction(isLoading)
+            .preference(key: HistoryInteractionBlockKey.self, value: isLoading)
             .navigationTitle("履歴")
             .tint(.teal)
             .listStyle(.insetGrouped)
-            .toolbar {
-                Button("ログアウト") {
-                    sessionStore.clear()
-                }
-                .disabled(isLoading)
-            }
             .refreshable {
                 await reload()
             }
@@ -80,7 +108,7 @@ struct HistoryView: View {
         Section {
             HStack(spacing: 12) {
                 Image(systemName: "calendar.circle.fill")
-                    .foregroundStyle(.white, .teal)
+                    .foregroundStyle(.teal)
                     .font(.title2)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("服薬履歴")
@@ -220,6 +248,17 @@ struct HistoryView: View {
         }
     }
 
+    private var signOutSection: some View {
+        Section {
+            Button(role: .destructive) {
+                sessionStore.clear()
+            } label: {
+                Text("ログアウト")
+            }
+            .disabled(isLoading)
+        }
+    }
+
     private var calendar: Calendar {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: "Asia/Tokyo") ?? .current
@@ -229,19 +268,11 @@ struct HistoryView: View {
     private let weekdaySymbols = ["日", "月", "火", "水", "木", "金", "土"]
 
     private func monthLabel(for date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ja_JP")
-        formatter.timeZone = calendar.timeZone
-        formatter.dateFormat = "yyyy年M月"
-        return formatter.string(from: date)
+        Formatters.monthLabel.string(from: date)
     }
 
     private func dayLabel(for date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ja_JP")
-        formatter.timeZone = calendar.timeZone
-        formatter.dateFormat = "yyyy/MM/dd (EEE)"
-        return formatter.string(from: date)
+        Formatters.dayLabel.string(from: date)
     }
 
     private func daysInMonth(for date: Date) -> [Date] {
@@ -302,28 +333,20 @@ struct HistoryView: View {
     }
 
     private func parseDate(_ value: String) -> Date? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: value) {
+        if let date = Formatters.isoDateTime.date(from: value) {
             return date
         }
-        return ISO8601DateFormatter().date(from: value)
+        return Formatters.isoDateTimeFallback.date(from: value)
     }
 
     private func formatDateTime(_ value: String) -> String {
         guard let date = parseDate(value) else { return value }
-        let formatter = DateFormatter()
-        formatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
-        formatter.dateFormat = "HH:mm"
-        return formatter.string(from: date)
+        return Formatters.timeJapan.string(from: date)
     }
 
     private func formatTimeSlot(_ value: String) -> String? {
         guard let date = parseDate(value) else { return nil }
-        let formatter = DateFormatter()
-        formatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
-        formatter.dateFormat = "HH:mm"
-        return formatter.string(from: date)
+        return Formatters.timeJapan.string(from: date)
     }
 
     private func presetLabel(for timeSlot: String) -> String? {
@@ -345,6 +368,15 @@ private enum HistoryMode: String, CaseIterable, Identifiable {
     case calendar = "カレンダー"
 
     var id: String { rawValue }
+}
+
+// Preference key to propagate whether interactions should be blocked (e.g., while loading)
+private struct HistoryInteractionBlockKey: PreferenceKey {
+    static var defaultValue: Bool = false
+    static func reduce(value: inout Bool, nextValue: () -> Bool) {
+        // If any child indicates blocking, keep it true
+        value = value || nextValue()
+    }
 }
 
 #Preview {

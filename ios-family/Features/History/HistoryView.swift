@@ -11,11 +11,45 @@ struct HistoryView: View {
     @State private var selectedMode: HistoryMode = .list
     @State private var calendarMonth = Date()
     @State private var selectedDate = Date()
-    private let notificationScheduler = FamilyNotificationScheduler()
+    @State private var bannerMessage: String?
+    @State private var isBannerVisible = false
+
+    private enum Formatters {
+        static let monthLabel: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "ja_JP")
+            formatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
+            formatter.dateFormat = "yyyy年M月"
+            return formatter
+        }()
+        static let dayLabel: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "ja_JP")
+            formatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
+            formatter.dateFormat = "yyyy/MM/dd (EEE)"
+            return formatter
+        }()
+        static let isoDateTime: ISO8601DateFormatter = {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            return formatter
+        }()
+        static let isoDateTimeFallback: ISO8601DateFormatter = {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime]
+            return formatter
+        }()
+        static let timeJapan: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
+            formatter.dateFormat = "HH:mm"
+            return formatter
+        }()
+    }
 
     var body: some View {
         NavigationStack {
-            ZStack {
+            ZStack(alignment: .top) {
                 List {
                     FamilyHeaderSection(
                         systemImage: "calendar.circle.fill",
@@ -38,9 +72,13 @@ struct HistoryView: View {
                     } else {
                         calendarSection
                     }
+                    signOutSection
                 }
                 .disabled(isLoading)
                 FamilyLoadingOverlay(isLoading: isLoading)
+                if let bannerMessage, isBannerVisible {
+                    bannerView(message: bannerMessage)
+                }
             }
             .blockTabBarInteraction(isLoading)
             .navigationTitle("履歴")
@@ -50,10 +88,6 @@ struct HistoryView: View {
                 ToolbarItemGroup(placement: .navigationBarTrailing) {
                     Button("更新") {
                         Task { await reloadAll() }
-                    }
-                    .disabled(isLoading)
-                    Button("ログアウト") {
-                        Task { await handleSignOut() }
                     }
                     .disabled(isLoading)
                 }
@@ -226,19 +260,11 @@ struct HistoryView: View {
     private let weekdaySymbols = ["日", "月", "火", "水", "木", "金", "土"]
 
     private func monthLabel(for date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ja_JP")
-        formatter.timeZone = calendar.timeZone
-        formatter.dateFormat = "yyyy年M月"
-        return formatter.string(from: date)
+        Formatters.monthLabel.string(from: date)
     }
 
     private func dayLabel(for date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "ja_JP")
-        formatter.timeZone = calendar.timeZone
-        formatter.dateFormat = "yyyy/MM/dd (EEE)"
-        return formatter.string(from: date)
+        Formatters.dayLabel.string(from: date)
     }
 
     private func daysInMonth(for date: Date) -> [Date] {
@@ -299,28 +325,20 @@ struct HistoryView: View {
     }
 
     private func parseDate(_ value: String) -> Date? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: value) {
+        if let date = Formatters.isoDateTime.date(from: value) {
             return date
         }
-        return ISO8601DateFormatter().date(from: value)
+        return Formatters.isoDateTimeFallback.date(from: value)
     }
 
     private func formatDateTime(_ value: String) -> String {
         guard let date = parseDate(value) else { return value }
-        let formatter = DateFormatter()
-        formatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
-        formatter.dateFormat = "HH:mm"
-        return formatter.string(from: date)
+        return Formatters.timeJapan.string(from: date)
     }
 
     private func formatTimeSlot(_ value: String) -> String? {
         guard let date = parseDate(value) else { return nil }
-        let formatter = DateFormatter()
-        formatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
-        formatter.dateFormat = "HH:mm"
-        return formatter.string(from: date)
+        return Formatters.timeJapan.string(from: date)
     }
 
     private func presetLabel(for timeSlot: String) -> String? {
@@ -333,6 +351,47 @@ struct HistoryView: View {
             return "夜"
         default:
             return nil
+        }
+    }
+
+    private func bannerView(message: String) -> some View {
+        Text(message)
+            .font(.subheadline.weight(.semibold))
+            .foregroundStyle(.white)
+            .multilineTextAlignment(.center)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 12)
+            .background(Color.teal.opacity(0.95), in: Capsule())
+            .shadow(color: .black.opacity(0.18), radius: 8, x: 0, y: 3)
+            .padding(.top, 10)
+            .padding(.horizontal, 16)
+            .transition(.move(edge: .top).combined(with: .opacity))
+            .zIndex(1)
+    }
+
+    private var signOutSection: some View {
+        Section {
+            Button(role: .destructive) {
+                Task { await handleSignOut() }
+            } label: {
+                Text("ログアウト")
+            }
+            .disabled(isLoading)
+        }
+    }
+
+    private func showBanner(_ message: String) {
+        bannerMessage = message
+        withAnimation(.spring(response: 0.35, dampingFraction: 0.85)) {
+            isBannerVisible = true
+        }
+        Task {
+            try? await Task.sleep(nanoseconds: 2_500_000_000)
+            await MainActor.run {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isBannerVisible = false
+                }
+            }
         }
     }
 
@@ -356,7 +415,6 @@ struct HistoryView: View {
             return
         }
 
-        await notificationScheduler.requestAuthorizationIfNeeded()
         let patientName = storedPatientName.isEmpty ? "患者" : storedPatientName
         let title = "\(patientName)が服用しました"
         let body: String
@@ -366,7 +424,7 @@ struct HistoryView: View {
         } else {
             body = "\(newlyTaken.count)件の服用記録が更新されました"
         }
-        await notificationScheduler.scheduleImmediateNotification(title: title, body: body)
+        showBanner("\(title)\n\(body)")
         saveLastSeenTakenAt(latest.1, for: selectedPatientId)
     }
 
@@ -380,9 +438,7 @@ struct HistoryView: View {
     }
 
     private func saveLastSeenTakenAt(_ date: Date, for patientId: String) {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        let value = formatter.string(from: date)
+        let value = Formatters.isoDateTime.string(from: date)
         UserDefaults.standard.set(value, forKey: lastSeenKey(for: patientId))
     }
 }

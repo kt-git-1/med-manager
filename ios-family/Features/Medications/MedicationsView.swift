@@ -9,11 +9,12 @@ struct MedicationsView: View {
     @State private var schedules: [FamilyScheduleDTO] = []
     @State private var name: String = ""
     @State private var dosage: String = ""
-    @State private var doseCountPerIntake: String = ""
-    @State private var startDate: String = Self.todayString()
-    @State private var endDate: String = ""
+    @State private var doseCountPerIntake: Int = 1
+    @State private var startDate: Date = Date()
+    @State private var endDate: Date = Date()
+    @State private var hasEndDate = false
     @State private var notes: String = ""
-    @State private var inventoryCount: String = ""
+    @State private var inventoryCount: Int = 0
     @State private var selectedPresetTimes = Set([PresetTime.morning])
     @State private var selectedWeekdays = Set([0, 1, 2, 3, 4, 5, 6])
     @State private var errorMessage: String?
@@ -21,6 +22,16 @@ struct MedicationsView: View {
     @State private var toastMessage = ""
     @State private var editingItem: MedicationEditItem?
     @State private var isLoading = false
+
+    private enum Formatters {
+        static let isoDate: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.calendar = Calendar(identifier: .gregorian)
+            formatter.timeZone = TimeZone.current
+            formatter.dateFormat = "yyyy-MM-dd"
+            return formatter
+        }()
+    }
 
     var body: some View {
         NavigationStack {
@@ -33,6 +44,7 @@ struct MedicationsView: View {
                     )
                     listSection
                     addSection
+                    signOutSection
                 }
                 .navigationTitle("薬")
                 .tint(.teal)
@@ -60,10 +72,7 @@ struct MedicationsView: View {
                     Color.black.opacity(0.2)
                         .ignoresSafeArea()
                     VStack(spacing: 12) {
-                        Image("AppLogo")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 64, height: 64)
+                        FamilyAppLogo(size: 64)
                         ProgressView()
                         Text("更新中")
                             .font(.headline)
@@ -81,10 +90,6 @@ struct MedicationsView: View {
                         Task { await reloadAll() }
                     }
                     .disabled(isLoading)
-                    Button("ログアウト") {
-                        Task { await handleSignOut() }
-                    }
-                    .disabled(isLoading)
                 }
             }
             .task {
@@ -100,7 +105,7 @@ struct MedicationsView: View {
         Section {
             HStack(spacing: 12) {
                 Image(systemName: "pills.fill")
-                    .foregroundStyle(.white, .teal)
+                    .foregroundStyle(.teal)
                     .font(.title2)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("薬を管理")
@@ -164,43 +169,24 @@ struct MedicationsView: View {
                     .foregroundStyle(.secondary)
                 TextField("例: 5mg", text: $dosage)
             }
-            VStack(alignment: .leading, spacing: 4) {
-                Text("服用数/回")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                TextField("例: 1", text: $doseCountPerIntake)
-                    .keyboardType(.numberPad)
+            Stepper(value: $doseCountPerIntake, in: 1...10) {
+                HStack {
+                    Text("服用数/回")
+                    Spacer()
+                    Text("\(doseCountPerIntake)")
+                        .foregroundStyle(.secondary)
+                }
             }
-            VStack(alignment: .leading, spacing: 4) {
-                Text("在庫数")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                TextField("例: 30", text: $inventoryCount)
-                    .keyboardType(.numberPad)
-            }
-            VStack(alignment: .leading, spacing: 4) {
-                Text("開始日")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                TextField("YYYY-MM-DD", text: $startDate)
-            }
-            VStack(alignment: .leading, spacing: 4) {
-                Text("終了日 (任意)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                TextField("YYYY-MM-DD", text: $endDate)
-            }
-            VStack(alignment: .leading, spacing: 4) {
-                Text("メモ (任意)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                TextField("例: 食後に服用", text: $notes)
+            DatePicker("開始日", selection: $startDate, displayedComponents: .date)
+            Toggle("終了日を設定", isOn: $hasEndDate.animation(.easeInOut(duration: 0.15)))
+            if hasEndDate {
+                DatePicker("終了日", selection: $endDate, displayedComponents: .date)
             }
             VStack(alignment: .leading, spacing: 8) {
                 Text("接種曜日")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                HStack(spacing: 8) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 44), spacing: 8)], spacing: 8) {
                     ForEach(weekdayLabels.indices, id: \.self) { index in
                         let isSelected = selectedWeekdays.contains(index)
                         Button(weekdayLabels[index]) {
@@ -215,7 +201,7 @@ struct MedicationsView: View {
                 Text("時間プリセット")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                HStack(spacing: 8) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 60), spacing: 8)], spacing: 8) {
                     ForEach(PresetTime.allCases, id: \.self) { preset in
                         let isSelected = selectedPresetTimes.contains(preset)
                         Button(preset.label) {
@@ -229,6 +215,29 @@ struct MedicationsView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            Stepper(value: $inventoryCount, in: 0...9999) {
+                HStack {
+                    Text("在庫数")
+                    Spacer()
+                    Text("\(inventoryCount)")
+                        .foregroundStyle(.secondary)
+                }
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text("メモ (任意)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                ZStack(alignment: .topLeading) {
+                    if notes.isEmpty {
+                        Text("例: 食後に服用")
+                            .foregroundStyle(.secondary.opacity(0.6))
+                            .padding(.top, 8)
+                            .padding(.leading, 4)
+                    }
+                    TextEditor(text: $notes)
+                        .frame(minHeight: 80)
+                }
+            }
             Button("追加する") {
                 Task { await createMedication() }
             }
@@ -238,11 +247,22 @@ struct MedicationsView: View {
                 selectedPatientId.isEmpty ||
                 name.isEmpty ||
                 dosage.isEmpty ||
-                startDate.isEmpty ||
+                doseCountPerIntake <= 0 ||
                 selectedPresetTimes.isEmpty ||
                 selectedWeekdays.isEmpty ||
                 familyJwtToken.isEmpty
             )
+        }
+    }
+
+    private var signOutSection: some View {
+        Section {
+            Button(role: .destructive) {
+                Task { await handleSignOut() }
+            } label: {
+                Text("ログアウト")
+            }
+            .disabled(isLoading)
         }
     }
 
@@ -285,7 +305,9 @@ struct MedicationsView: View {
             errorMessage = "時間の数が回数/日と一致していません。"
             return
         }
-        let inventory = Int(inventoryCount) ?? 0
+        let inventory = max(inventoryCount, 0)
+        let startDateString = formatDate(startDate)
+        let endDateString = hasEndDate ? formatDate(endDate) : nil
         let days = selectedWeekdays.sorted()
         do {
             let client = try FamilyAPIClient(token: familyJwtToken)
@@ -293,9 +315,9 @@ struct MedicationsView: View {
                 patientId: selectedPatientId,
                 name: name,
                 dosage: dosage,
-                doseCountPerIntake: Int(doseCountPerIntake) ?? 1,
-                startDate: startDate,
-                endDate: endDate.isEmpty ? nil : endDate,
+                doseCountPerIntake: doseCountPerIntake,
+                startDate: startDateString,
+                endDate: endDateString,
                 notes: notes.isEmpty ? nil : notes
             )
             let schedule = try await client.createSchedule(
@@ -304,8 +326,8 @@ struct MedicationsView: View {
                 daysOfWeek: days,
                 timesPerDay: count,
                 timeSlots: slots,
-                startDate: startDate,
-                endDate: endDate.isEmpty ? nil : endDate
+                startDate: startDateString,
+                endDate: endDateString
             )
             if inventory > 0 {
                 _ = try await client.createInventoryAdjustment(
@@ -320,8 +342,12 @@ struct MedicationsView: View {
             name = ""
             dosage = ""
             notes = ""
+            doseCountPerIntake = 1
+            startDate = Date()
+            endDate = Date()
+            hasEndDate = false
             selectedPresetTimes = Set([.morning])
-            inventoryCount = ""
+            inventoryCount = 0
             showToast(message: "薬を追加しました。")
         } catch {
             errorMessage = "薬の追加または予定/在庫設定に失敗しました。"
@@ -397,11 +423,11 @@ struct MedicationsView: View {
     }
 
     private static func todayString() -> String {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.timeZone = TimeZone.current
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: Date())
+        Formatters.isoDate.string(from: Date())
+    }
+
+    private func formatDate(_ date: Date) -> String {
+        Formatters.isoDate.string(from: date)
     }
 
     private let weekdayLabels = ["日", "月", "火", "水", "木", "金", "土"]
@@ -460,8 +486,9 @@ struct MedicationsView: View {
             errorMessage = nil
             return
         }
-        await loadMedications()
-        await loadSchedules()
+        async let medicationsTask = loadMedications()
+        async let schedulesTask = loadSchedules()
+        _ = await (medicationsTask, schedulesTask)
     }
 }
 
@@ -497,18 +524,30 @@ private struct MedicationEditSheet: View {
     @Environment(\.dismiss) private var dismiss
     @State private var name: String
     @State private var dosage: String
-    @State private var doseCountPerIntake: String
-    @State private var startDate: String
-    @State private var endDate: String
+    @State private var doseCountPerIntake: Int
+    @State private var startDate: Date
+    @State private var endDate: Date
+    @State private var hasEndDate: Bool
     @State private var notes: String
     @State private var schedulePresetTimes: Set<PresetTime>
     @State private var scheduleWeekdays: Set<Int>
-    @State private var scheduleStartDate: String
-    @State private var scheduleEndDate: String
+    @State private var scheduleStartDate: Date
+    @State private var scheduleEndDate: Date
+    @State private var hasScheduleEndDate: Bool
     @State private var errorMessage: String?
     @State private var hasNonPresetTimes = false
     @State private var isSaving = false
     @State private var showDeleteConfirm = false
+
+    private enum Formatters {
+        static let isoDate: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.calendar = Calendar(identifier: .gregorian)
+            formatter.timeZone = TimeZone.current
+            formatter.dateFormat = "yyyy-MM-dd"
+            return formatter
+        }()
+    }
 
     init(
         medication: FamilyMedicationDTO,
@@ -522,22 +561,25 @@ private struct MedicationEditSheet: View {
         self.onDelete = onDelete
         _name = State(initialValue: medication.name)
         _dosage = State(initialValue: medication.dosage)
-        _doseCountPerIntake = State(initialValue: String(medication.doseCountPerIntake))
-        _startDate = State(initialValue: medication.startDate)
-        _endDate = State(initialValue: medication.endDate ?? "")
+        _doseCountPerIntake = State(initialValue: max(medication.doseCountPerIntake, 1))
+        _startDate = State(initialValue: Self.parseDate(medication.startDate, fallback: Date()))
+        _endDate = State(initialValue: Self.parseDate(medication.endDate ?? medication.startDate, fallback: Date()))
+        _hasEndDate = State(initialValue: medication.endDate != nil)
         _notes = State(initialValue: medication.notes ?? "")
         let (presetTimes, hasNonPreset) = PresetTime.selection(from: schedule?.timeSlots ?? [])
         _schedulePresetTimes = State(initialValue: presetTimes.isEmpty ? Set([.morning]) : presetTimes)
         _hasNonPresetTimes = State(initialValue: hasNonPreset)
         _scheduleWeekdays = State(initialValue: Set(schedule?.daysOfWeek ?? [0, 1, 2, 3, 4, 5, 6]))
-        _scheduleStartDate = State(initialValue: schedule?.startDate ?? medication.startDate)
-        _scheduleEndDate = State(initialValue: schedule?.endDate ?? "")
+        let scheduleStart = schedule?.startDate ?? medication.startDate
+        _scheduleStartDate = State(initialValue: Self.parseDate(scheduleStart, fallback: Date()))
+        _scheduleEndDate = State(initialValue: Self.parseDate(schedule?.endDate ?? scheduleStart, fallback: Date()))
+        _hasScheduleEndDate = State(initialValue: schedule?.endDate != nil)
     }
 
     var body: some View {
         NavigationStack {
             Form {
-                Section(header: Text("薬情報")) {
+                Section(header: Text("薬を編集")) {
                     VStack(alignment: .leading, spacing: 4) {
                         Text("名前")
                             .font(.caption)
@@ -550,39 +592,39 @@ private struct MedicationEditSheet: View {
                             .foregroundStyle(.secondary)
                         TextField("例: 5mg", text: $dosage)
                     }
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("服用数/回")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        TextField("例: 1", text: $doseCountPerIntake)
-                            .keyboardType(.numberPad)
+                    Stepper(value: $doseCountPerIntake, in: 1...10) {
+                        HStack {
+                            Text("服用数/回")
+                            Spacer()
+                            Text("\(doseCountPerIntake)")
+                                .foregroundStyle(.secondary)
+                        }
                     }
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("開始日")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        TextField("YYYY-MM-DD", text: $startDate)
-                    }
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("終了日 (任意)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        TextField("YYYY-MM-DD", text: $endDate)
+                    DatePicker("開始日", selection: $startDate, displayedComponents: .date)
+                    Toggle("終了日を設定", isOn: $hasEndDate.animation(.easeInOut(duration: 0.15)))
+                    if hasEndDate {
+                        DatePicker("終了日", selection: $endDate, displayedComponents: .date)
                     }
                     VStack(alignment: .leading, spacing: 4) {
                         Text("メモ (任意)")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        TextField("例: 食後に服用", text: $notes)
+                        ZStack(alignment: .topLeading) {
+                            if notes.isEmpty {
+                                Text("例: 食後に服用")
+                                    .foregroundStyle(.secondary.opacity(0.6))
+                                    .padding(.top, 8)
+                                    .padding(.leading, 4)
+                            }
+                            TextEditor(text: $notes)
+                                .frame(minHeight: 80)
+                        }
                     }
-                }
-
-                Section(header: Text("予定")) {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("接種曜日")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        HStack(spacing: 8) {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 44), spacing: 8)], spacing: 8) {
                             ForEach(weekdayLabels.indices, id: \.self) { index in
                                 let isSelected = scheduleWeekdays.contains(index)
                                 Button(weekdayLabels[index]) {
@@ -597,7 +639,7 @@ private struct MedicationEditSheet: View {
                         Text("時間プリセット")
                             .font(.caption)
                             .foregroundStyle(.secondary)
-                        HStack(spacing: 8) {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 60), spacing: 8)], spacing: 8) {
                             ForEach(PresetTime.allCases, id: \.self) { preset in
                                 let isSelected = schedulePresetTimes.contains(preset)
                                 Button(preset.label) {
@@ -616,17 +658,10 @@ private struct MedicationEditSheet: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("開始日")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        TextField("YYYY-MM-DD", text: $scheduleStartDate)
-                    }
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("終了日 (任意)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        TextField("YYYY-MM-DD", text: $scheduleEndDate)
+                    DatePicker("開始日", selection: $scheduleStartDate, displayedComponents: .date)
+                    Toggle("予定の終了日を設定", isOn: $hasScheduleEndDate.animation(.easeInOut(duration: 0.15)))
+                    if hasScheduleEndDate {
+                        DatePicker("終了日", selection: $scheduleEndDate, displayedComponents: .date)
                     }
                 }
 
@@ -687,25 +722,17 @@ private struct MedicationEditSheet: View {
         errorMessage = nil
         let slots = PresetTime.orderedSelection(schedulePresetTimes).map { $0.timeString }
         let timesPerDay = slots.count
-        let trimmedStartDate = startDate.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedEndDate = endDate.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedScheduleStartDate = scheduleStartDate.trimmingCharacters(in: .whitespacesAndNewlines)
-        let trimmedScheduleEndDate = scheduleEndDate.trimmingCharacters(in: .whitespacesAndNewlines)
+        let startDateString = formatDate(startDate)
+        let endDateString = hasEndDate ? formatDate(endDate) : nil
+        let scheduleStartDateString = formatDate(scheduleStartDate)
+        let scheduleEndDateString = hasScheduleEndDate ? formatDate(scheduleEndDate) : nil
 
-        guard !name.isEmpty, !dosage.isEmpty, !trimmedStartDate.isEmpty else {
+        guard !name.isEmpty, !dosage.isEmpty else {
             errorMessage = "薬情報が未入力です。"
             return
         }
-        guard let intakeCount = Int(doseCountPerIntake), intakeCount > 0 else {
+        guard doseCountPerIntake > 0 else {
             errorMessage = "服用数/回を入力してください。"
-            return
-        }
-        guard isValidIsoDate(trimmedStartDate) else {
-            errorMessage = "開始日はYYYY-MM-DD形式で入力してください。"
-            return
-        }
-        if !trimmedEndDate.isEmpty, !isValidIsoDate(trimmedEndDate) {
-            errorMessage = "終了日はYYYY-MM-DD形式で入力してください。"
             return
         }
         guard !slots.isEmpty, timesPerDay > 0, slots.count == timesPerDay else {
@@ -716,18 +743,6 @@ private struct MedicationEditSheet: View {
             errorMessage = "接種曜日を選択してください。"
             return
         }
-        guard !trimmedScheduleStartDate.isEmpty else {
-            errorMessage = "予定の開始日を入力してください。"
-            return
-        }
-        guard isValidIsoDate(trimmedScheduleStartDate) else {
-            errorMessage = "予定の開始日はYYYY-MM-DD形式で入力してください。"
-            return
-        }
-        if !trimmedScheduleEndDate.isEmpty, !isValidIsoDate(trimmedScheduleEndDate) {
-            errorMessage = "予定の終了日はYYYY-MM-DD形式で入力してください。"
-            return
-        }
 
         isSaving = true
         defer { isSaving = false }
@@ -735,16 +750,16 @@ private struct MedicationEditSheet: View {
             medicationId: medication.id,
             name: name,
             dosage: dosage,
-            doseCountPerIntake: intakeCount,
-            startDate: trimmedStartDate,
-            endDate: trimmedEndDate.isEmpty ? nil : trimmedEndDate,
+            doseCountPerIntake: doseCountPerIntake,
+            startDate: startDateString,
+            endDate: endDateString,
             notes: notes.isEmpty ? nil : notes,
             scheduleId: schedule?.id,
             daysOfWeek: scheduleWeekdays.sorted(),
             timesPerDay: timesPerDay,
             timeSlots: slots,
-            scheduleStartDate: trimmedScheduleStartDate,
-            scheduleEndDate: trimmedScheduleEndDate.isEmpty ? nil : trimmedScheduleEndDate
+            scheduleStartDate: scheduleStartDateString,
+            scheduleEndDate: scheduleEndDateString
         )
         await onSave(result)
     }
@@ -757,13 +772,12 @@ private struct MedicationEditSheet: View {
         }
     }
 
-    private func isValidIsoDate(_ value: String) -> Bool {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.timeZone = TimeZone(secondsFromGMT: 0)
-        formatter.dateFormat = "yyyy-MM-dd"
-        formatter.isLenient = false
-        return formatter.date(from: value) != nil
+    private func formatDate(_ date: Date) -> String {
+        Formatters.isoDate.string(from: date)
+    }
+
+    private static func parseDate(_ value: String, fallback: Date) -> Date {
+        Formatters.isoDate.date(from: value) ?? fallback
     }
 }
 

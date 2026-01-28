@@ -10,6 +10,26 @@ struct InventoryView: View {
     @State private var errorMessage: String?
     @State private var isLoading = false
 
+    private enum Formatters {
+        static let shortDateTime: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.calendar = Calendar(identifier: .gregorian)
+            formatter.timeZone = TimeZone.current
+            formatter.dateFormat = "yyyy/MM/dd HH:mm"
+            return formatter
+        }()
+        static let isoDateTime: ISO8601DateFormatter = {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            return formatter
+        }()
+        static let isoDateTimeFallback: ISO8601DateFormatter = {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime]
+            return formatter
+        }()
+    }
+
     var body: some View {
         NavigationStack {
             ZStack {
@@ -20,15 +40,13 @@ struct InventoryView: View {
                         selectedPatientName: storedPatientName
                     )
                     inventorySection
+                    signOutSection
                 }
                 if isLoading {
                     Color.black.opacity(0.2)
                         .ignoresSafeArea()
                     VStack(spacing: 12) {
-                        Image("AppLogo")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: 64, height: 64)
+                        FamilyAppLogo(size: 64)
                         ProgressView()
                         Text("更新中")
                             .font(.headline)
@@ -49,9 +67,6 @@ struct InventoryView: View {
                         Task { await reloadAll() }
                     }
                     .disabled(isLoading)
-                    Button("ログアウト") {
-                        Task { await handleSignOut() }
-                    }
                 }
             }
             .task {
@@ -67,7 +82,7 @@ struct InventoryView: View {
         Section {
             HStack(spacing: 12) {
                 Image(systemName: "tray.full.fill")
-                    .foregroundStyle(.white, .teal)
+                    .foregroundStyle(.teal)
                     .font(.title2)
                 VStack(alignment: .leading, spacing: 4) {
                     Text("在庫管理")
@@ -95,6 +110,17 @@ struct InventoryView: View {
                     inventoryRow(item)
                 }
             }
+        }
+    }
+
+    private var signOutSection: some View {
+        Section {
+            Button(role: .destructive) {
+                Task { await handleSignOut() }
+            } label: {
+                Text("ログアウト")
+            }
+            .disabled(isLoading)
         }
     }
 
@@ -158,12 +184,13 @@ struct InventoryView: View {
             return
         }
         errorMessage = nil
-        isLoading = true
-        defer { isLoading = false }
         do {
             let client = try FamilyAPIClient(token: familyJwtToken)
-            medications = try await client.listMedications(patientId: selectedPatientId)
-            inventoryItems = try await client.listInventory(patientId: selectedPatientId)
+            async let medsTask = client.listMedications(patientId: selectedPatientId)
+            async let inventoryTask = client.listInventory(patientId: selectedPatientId)
+            let (medicationsResult, inventoryResult) = try await (medsTask, inventoryTask)
+            medications = medicationsResult
+            inventoryItems = inventoryResult
         } catch {
             errorMessage = "在庫の取得に失敗しました。"
         }
@@ -182,24 +209,13 @@ struct InventoryView: View {
     }
 
     private func formatDateTime(_ value: String) -> String {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: value) {
-            return shortDateFormatter.string(from: date)
+        if let date = Formatters.isoDateTime.date(from: value) {
+            return Formatters.shortDateTime.string(from: date)
         }
-        formatter.formatOptions = [.withInternetDateTime]
-        if let date = formatter.date(from: value) {
-            return shortDateFormatter.string(from: date)
+        if let date = Formatters.isoDateTimeFallback.date(from: value) {
+            return Formatters.shortDateTime.string(from: date)
         }
         return value
-    }
-
-    private var shortDateFormatter: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.timeZone = TimeZone.current
-        formatter.dateFormat = "yyyy/MM/dd HH:mm"
-        return formatter
     }
 }
 

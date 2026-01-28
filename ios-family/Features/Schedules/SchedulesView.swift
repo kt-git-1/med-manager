@@ -11,6 +11,54 @@ struct SchedulesView: View {
     @State private var errorMessage: String?
     @State private var isLoading = false
     @State private var sendingIds: Set<String> = []
+    @State private var selectedTab: ScheduleTab = .today
+
+    private enum ScheduleTab: String, CaseIterable, Identifiable {
+        case today
+        case list
+
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .today:
+                return "今日の予定"
+            case .list:
+                return "予定一覧"
+            }
+        }
+    }
+
+    private enum Formatters {
+        static let timeJapan: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
+            formatter.dateFormat = "HH:mm"
+            return formatter
+        }()
+        static let timeLocal: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.timeZone = TimeZone.current
+            formatter.dateFormat = "HH:mm"
+            return formatter
+        }()
+        static let isoDate: DateFormatter = {
+            let formatter = DateFormatter()
+            formatter.calendar = Calendar(identifier: .gregorian)
+            formatter.timeZone = TimeZone.current
+            formatter.dateFormat = "yyyy-MM-dd"
+            return formatter
+        }()
+        static let isoDateTime: ISO8601DateFormatter = {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+            return formatter
+        }()
+        static let isoDateTimeFallback: ISO8601DateFormatter = {
+            let formatter = ISO8601DateFormatter()
+            formatter.formatOptions = [.withInternetDateTime]
+            return formatter
+        }()
+    }
 
     var body: some View {
         NavigationStack {
@@ -25,36 +73,20 @@ struct SchedulesView: View {
                         selectedPatientId: selectedPatientId,
                         selectedPatientName: storedPatientName
                     )
-                    todayDoseSection
-                    Section(header: Text("予定一覧")) {
-                        if let errorMessage {
-                            Text(errorMessage).foregroundStyle(.red)
-                        }
-                        if schedules.isEmpty {
-                            Text("まだ予定が登録されていません。")
-                                .foregroundStyle(.secondary)
-                        } else {
-                            ForEach(schedules, id: \.id) { schedule in
-                                VStack(alignment: .leading, spacing: 4) {
-                                    if let medicationName = medicationName(for: schedule.medicationId) {
-                                        Text(medicationName)
-                                            .font(.subheadline)
-                                            .foregroundStyle(.secondary)
-                                    } else {
-                                        Text("薬名: 取得中...")
-                                            .font(.subheadline)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                    Text(schedule.timeSlots.joined(separator: " / "))
-                                        .font(.headline)
-                                    Text("開始日: \(schedule.startDate)")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                                .padding(.vertical, 4)
+                    Section {
+                        Picker("表示", selection: $selectedTab) {
+                            ForEach(ScheduleTab.allCases) { tab in
+                                Text(tab.title).tag(tab)
                             }
                         }
+                        .pickerStyle(.segmented)
                     }
+                    if selectedTab == .today {
+                        todayDoseSection
+                    } else {
+                        scheduleListSection
+                    }
+                    signOutSection
                 }
                 .navigationTitle("予定")
                 .tint(.teal)
@@ -67,9 +99,6 @@ struct SchedulesView: View {
                         Task { await reloadAll() }
                     }
                     .disabled(isLoading)
-                    Button("ログアウト") {
-                        Task { await handleSignOut() }
-                    }
                 }
             }
             .task {
@@ -77,6 +106,38 @@ struct SchedulesView: View {
             }
             .onChange(of: storedPatientId) { _ in
                 Task { await reloadAll() }
+            }
+        }
+    }
+
+    private var scheduleListSection: some View {
+        Section(header: Text("予定一覧")) {
+            if let errorMessage {
+                Text(errorMessage).foregroundStyle(.red)
+            }
+            if schedules.isEmpty {
+                Text("まだ予定が登録されていません。")
+                    .foregroundStyle(.secondary)
+            } else {
+                ForEach(schedules, id: \.id) { schedule in
+                    VStack(alignment: .leading, spacing: 4) {
+                        if let medicationName = medicationName(for: schedule.medicationId) {
+                            Text(medicationName)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            Text("薬名: 取得中...")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        Text(schedule.timeSlots.joined(separator: " / "))
+                            .font(.headline)
+                        Text("開始日: \(schedule.startDate)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 4)
+                }
             }
         }
     }
@@ -135,9 +196,10 @@ struct SchedulesView: View {
             errorMessage = nil
             return
         }
-        await loadTodayDoseInstances()
-        await loadMedications()
-        await loadSchedules()
+        async let todayTask = loadTodayDoseInstances()
+        async let medicationTask = loadMedications()
+        async let schedulesTask = loadSchedules()
+        _ = await (todayTask, medicationTask, schedulesTask)
     }
 
     private func medicationName(for medicationId: String) -> String? {
@@ -205,6 +267,17 @@ struct SchedulesView: View {
         }
     }
 
+    private var signOutSection: some View {
+        Section {
+            Button(role: .destructive) {
+                Task { await handleSignOut() }
+            } label: {
+                Text("ログアウト")
+            }
+            .disabled(isLoading)
+        }
+    }
+
     private func sendAdherence(_ item: FamilyDoseInstanceDTO, action: String) async {
         await MainActor.run {
             sendingIds.insert(item.id)
@@ -244,18 +317,12 @@ struct SchedulesView: View {
 
     private func formatTime(_ value: String) -> String {
         guard let date = parseDate(value) else { return value }
-        let formatter = DateFormatter()
-        formatter.timeZone = TimeZone(identifier: "Asia/Tokyo")
-        formatter.dateFormat = "HH:mm"
-        return formatter.string(from: date)
+        return Formatters.timeJapan.string(from: date)
     }
 
     private func formatTimeSlot(_ value: String) -> String? {
         guard let date = parseDate(value) else { return nil }
-        let formatter = DateFormatter()
-        formatter.timeZone = TimeZone.current
-        formatter.dateFormat = "HH:mm"
-        return formatter.string(from: date)
+        return Formatters.timeLocal.string(from: date)
     }
 
     private func presetLabel(for timeSlot: String) -> String? {
@@ -272,24 +339,18 @@ struct SchedulesView: View {
     }
 
     private func isoDate() -> String {
-        let formatter = DateFormatter()
-        formatter.calendar = Calendar(identifier: .gregorian)
-        formatter.timeZone = TimeZone.current
-        formatter.dateFormat = "yyyy-MM-dd"
-        return formatter.string(from: Date())
+        Formatters.isoDate.string(from: Date())
     }
 
     private func isoDateTime() -> String {
-        ISO8601DateFormatter().string(from: Date())
+        Formatters.isoDateTime.string(from: Date())
     }
 
     private func parseDate(_ value: String) -> Date? {
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        if let date = formatter.date(from: value) {
+        if let date = Formatters.isoDateTime.date(from: value) {
             return date
         }
-        return ISO8601DateFormatter().date(from: value)
+        return Formatters.isoDateTimeFallback.date(from: value)
     }
 
 }

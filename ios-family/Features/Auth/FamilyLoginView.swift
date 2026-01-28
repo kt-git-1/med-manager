@@ -13,7 +13,7 @@ struct FamilyLoginView: View {
                 Section {
                     HStack(spacing: 12) {
                         Image(systemName: "lock.shield.fill")
-                            .foregroundStyle(.white, .teal)
+                            .foregroundStyle(.teal)
                             .font(.title2)
                         VStack(alignment: .leading, spacing: 4) {
                             Text("家族アカウントでログイン")
